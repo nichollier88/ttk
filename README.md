@@ -11,3 +11,15 @@ The (now dead) website: http://ipodlinux.org/
 
 All files are licensed under GNU General Public License v2.0 unless otherwise specified.  
 http://www.gnu.org/licenses/gpl-2.0.html 
+
+# Dependencies
+
+```
+flex libsdl1.2-dev libsdl-image1.2-dev
+```
+
+# Build
+
+```
+make NOIPOD=1 NOHDOG=1 all -j
+```
