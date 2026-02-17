@@ -18,29 +18,28 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include "ttk.h"
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-int main (int argc, char **argv) 
-{
+#include "ttk.h"
+
+int main(int argc, char** argv) {
     if (argc <= 1) {
-	fprintf (stderr, "Usage: ./eximage somefile.png\n");
-	return 1;
+        fprintf(stderr, "Usage: ./eximage somefile.png\n");
+        return 1;
     }
-    
-    TWindow *mainwindow;
-    TWidget *imgviewer;
-    ttk_surface img=ttk_load_image(argv[1]);
+
+    TWindow* mainwindow;
+    TWidget* imgviewer;
+    ttk_surface img = ttk_load_image(argv[1]);
 
     mainwindow = ttk_init();
-    ttk_menufont = ttk_get_font ("Chicago", 12);
-    ttk_textfont = ttk_get_font ("Espy Sans", 10);
-    
-    imgviewer = ttk_new_imgview_widget (mainwindow->w, mainwindow->h,
-					img);
-    ttk_add_widget (mainwindow, imgviewer);
-    ttk_window_title (mainwindow, "Image Viewer");
+    ttk_menufont = ttk_get_font("Chicago", 12);
+    ttk_textfont = ttk_get_font("Espy Sans", 10);
+
+    imgviewer = ttk_new_imgview_widget(mainwindow->w, mainwindow->h, img);
+    ttk_add_widget(mainwindow, imgviewer);
+    ttk_window_title(mainwindow, "Image Viewer");
     ttk_run();
     ttk_free_image(img);
     ttk_free_window(mainwindow);

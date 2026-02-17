@@ -18,8 +18,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef _ALL_TTK_H_
-#define _ALL_TTK_H_
+#pragma once
 
 /* version is 0xMMMmm  MAJOR minor */
 /* so, 0x10117 is v101.17 */
@@ -42,11 +41,9 @@ extern "C" {
 #include <ttk/imgview.h>
 #include <ttk/gradient.h>
 #include <ttk/textarea.h>
-# include <ttk/mwin-emu.h>
+#include <ttk/mwin-emu.h>
 #include <ttk/appearance.h>
 #ifdef __cplusplus
 }
 #include <ttk/ttkmm.h>
-#endif
-
 #endif
