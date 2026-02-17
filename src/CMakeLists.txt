@@ -32,7 +32,8 @@ else()
 endif()
 
 # Sources
-set(TTK_COMMON_SOURCES
+set(TTK_SOURCES
+    ttk.c
     menu.c
     icons.c
     slider.c
@@ -43,22 +44,9 @@ set(TTK_COMMON_SOURCES
     gradient.c
 )
 
-set(TTK_C_SOURCES
-    ttk.c
-    ${TTK_COMMON_SOURCES}
-)
-
-set(TTK_CPP_SOURCES
-    ttk.cpp
-    TWidget.cpp
-    TWindow.cpp
-    ${TTK_COMMON_SOURCES}
-)
-
 if(TTF)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL_ttf.c")
-        list(APPEND TTK_C_SOURCES SDL_ttf.c)
-        list(APPEND TTK_CPP_SOURCES SDL_ttf.c)
+        list(APPEND TTK_SOURCES SDL_ttf.c)
     else()
         message(WARNING "SDL_ttf.c not found. Disabling TTF support.")
         add_definitions(-DNO_TF)
@@ -69,17 +57,15 @@ endif()
 
 # Check for ttkmm extension
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ttkmm.cc")
-    list(APPEND TTK_CPP_SOURCES ttkmm.cc)
-elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ttkmm.c")
-    list(APPEND TTK_C_SOURCES ttkmm.c)
-    list(APPEND TTK_CPP_SOURCES ttkmm.c)
+    list(APPEND TTK_SOURCES ttkmm.cc)
+else()
+    list(APPEND TTK_SOURCES ttkmm.c)
 endif()
 
 # GFXLIB Configuration
 if(GFXLIB STREQUAL "hotdog")
     add_definitions(-DHDOG)
-    list(APPEND TTK_C_SOURCES hotdog.c)
-    list(APPEND TTK_CPP_SOURCES hotdog.c)
+    list(APPEND TTK_SOURCES hotdog.c)
     include_directories(../../hotdog ../../../hotdog)
     
     if(NOT IPOD)
@@ -92,8 +78,7 @@ if(GFXLIB STREQUAL "hotdog")
 
 elseif(GFXLIB STREQUAL "SDL")
     add_definitions(-DSDL)
-    list(APPEND TTK_C_SOURCES sdl.c SDL_gfxPrimitives.c SDL_gfxPrimitives_Byte.c SDL_rotozoom.c SFont.c)
-    list(APPEND TTK_CPP_SOURCES sdl.c SDL_gfxPrimitives.c SDL_gfxPrimitives_Byte.c SDL_rotozoom.c SFont.c)
+    list(APPEND TTK_SOURCES sdl.c SDL_gfxPrimitives.c SDL_gfxPrimitives_Byte.c SDL_rotozoom.c SFont.c)
     
     if(IPOD)
         include_directories(../sdlincludes)
@@ -114,16 +99,12 @@ elseif(GFXLIB STREQUAL "SDL")
 elseif(GFXLIB STREQUAL "mwin")
     add_definitions(-DMWIN)
     include_directories(../mwincludes)
-    list(APPEND TTK_C_SOURCES mwin.c)
-    list(APPEND TTK_CPP_SOURCES mwin.c)
+    list(APPEND TTK_SOURCES mwin.c)
 endif()
 
 # Library
-add_library(ttk STATIC ${TTK_C_SOURCES})
+add_library(ttk STATIC ${TTK_SOURCES})
 set_target_properties(ttk PROPERTIES OUTPUT_NAME ttk-${GFXLIB})
-
-add_library(ttk-cpp STATIC ${TTK_CPP_SOURCES})
-set_target_properties(ttk-cpp PROPERTIES OUTPUT_NAME ttk-${GFXLIB}-cpp)
 
 # Dependencies
 set(TTK_LIBS "")
