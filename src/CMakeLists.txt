@@ -3,18 +3,13 @@ cmake_minimum_required(VERSION 3.10)
 project(ttk C CXX)
 
 # Options
-option(DEBUG "Enable debug build" OFF)
 option(IPOD "Build for iPod" OFF)
 option(TTF "Enable TTF support" ON)
-option(BUILD_LNDIR "Build lndir utility" OFF)
 set(GFXLIB "SDL" CACHE STRING "Graphics library to use (SDL, hotdog, mwin)")
 
-# Compiler Flags
-if(DEBUG)
-    add_compile_options(-g)
-else()
-    add_compile_options(-O2 -frename-registers -finline-functions -funroll-loops -fomit-frame-pointer)
-endif()
+# Add legacy optimizations to the standard Release configuration
+# CMake automatically handles -g for Debug and -O3 for Release, but we append the specific tuning flags here.
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -frename-registers -finline-functions -funroll-loops -fomit-frame-pointer")
 
 add_compile_options(-Wall -Wno-unused -Wno-implicit -Wno-char-subscripts)
 
@@ -148,8 +143,3 @@ foreach(EX ${EXAMPLES})
     add_executable(${EX} ${EX}.c)
     target_link_libraries(${EX} ttk ${TTK_LIBS})
 endforeach()
-
-# Legacy build tool
-if(BUILD_LNDIR AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../lndir.c")
-    add_executable(lndir "../lndir.c")
-endif()
