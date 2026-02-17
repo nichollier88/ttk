@@ -28,6 +28,9 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "TWidget.hpp"
+#include "TWindow.h"
+
 TWindowStack* ttk_windows = 0;
 ttk_font ttk_menufont, ttk_textfont;
 ttk_screeninfo* ttk_screen = 0;
@@ -58,12 +61,6 @@ static int header_text_pos = -1;
 #define outl(datum, addr) (*(volatile unsigned long*)(addr) = (datum))
 #define inl(addr) (*(volatile unsigned long*)(addr))
 #endif
-
-void ttk_widget_nodrawing(TWidget* w, ttk_surface s) {}
-int ttk_widget_noaction_2(TWidget* w, int i1, int i2) { return TTK_EV_UNUSED; }
-int ttk_widget_noaction_1(TWidget* w, int i) { return TTK_EV_UNUSED; }
-int ttk_widget_noaction_i0(TWidget* w) { return 0; }
-void ttk_widget_noaction_0(TWidget* w) {}
 
 #ifdef IPOD
 #define FONTSDIR "/usr/share/fonts"
@@ -141,13 +138,13 @@ static int ttk_parse_fonts_list(const char* flf) {
         }
 
         if (!ttk_fonts) {
-            ttk_fonts = current = malloc(sizeof(ttk_fontinfo));
+            ttk_fonts = current = (ttk_fontinfo*)malloc(sizeof(ttk_fontinfo));
         } else {
             if (!current) {
                 current = ttk_fonts;
                 while (current->next) current = current->next;
             }
-            current->next = malloc(sizeof(ttk_fontinfo));
+            current->next = (ttk_fontinfo*)malloc(sizeof(ttk_fontinfo));
             current = current->next;
         }
 
@@ -288,7 +285,7 @@ TWindow* ttk_init() {
     if (!ttk_screen) {
         int ver;
 
-        ttk_screen = malloc(sizeof(ttk_screeninfo));
+        ttk_screen = (ttk_screeninfo*)malloc(sizeof(ttk_screeninfo));
 #ifdef IPOD
         ver = ttk_get_podversion();
         if (ver & (TTK_POD_1G | TTK_POD_2G | TTK_POD_3G | TTK_POD_4G)) {
@@ -455,13 +452,13 @@ static int do_timers(TWidget* wid, int tick) {
     if (wid->frame && wid->framedelay &&
         (wid->framelast + wid->framedelay <= tick)) {
         wid->framelast = tick;
-        eret |= wid->frame(wid) & ~TTK_EV_UNUSED;
+        eret |= wid->frame() & ~TTK_EV_UNUSED;
     }
 
     if (wid->timer && wid->timerdelay &&
         (wid->timerlast + wid->timerdelay <= tick)) {
         wid->timerlast = tick + 1;
-        eret |= wid->timer(wid) & ~TTK_EV_UNUSED;
+        eret |= wid->timer() & ~TTK_EV_UNUSED;
     }
 
     return eret;
@@ -473,9 +470,9 @@ static int do_draw(TWidget* wid, int force) {
             ttk_fillrect(wid->win->srf, wid->x, wid->y, wid->x + wid->w,
                          wid->y + wid->h, ttk_makecol(CKEY));
         if (wid->win)
-            wid->draw(wid, wid->win->srf);
+            wid->draw(wid->win->srf);
         else
-            wid->draw(wid, ttk_screen->srf);
+            wid->draw(ttk_screen->srf);
         wid->dirty = 0;
         return 1;
     }
@@ -644,7 +641,7 @@ int ttk_run() {
                 if (local && (ttk_button_pressedfor[earg] == evtarget) &&
                     ((ttk_button_presstime[earg] == tick) ||
                      evtarget->keyrepeat)) {
-                    int er = evtarget->down(evtarget, earg);
+                    int er = evtarget->down(earg);
                     ttk_button_erets[earg] |= er;
                     eret |= er & ~TTK_EV_UNUSED;
                 }
@@ -661,7 +658,7 @@ int ttk_run() {
                 ttk_button_pressedfor[earg] = 0;
 
                 if (evtarget == pf && local && !hs) {
-                    int er = evtarget->button(evtarget, earg, time);
+                    int er = evtarget->button(earg, time);
                     // If *both* down and button returned unused, do unused.
                     // Otherwise, don't.
                     eret |= er;
@@ -676,8 +673,7 @@ int ttk_run() {
                 ttk_button_erets[earg] = 0;
                 break;
             case TTK_SCROLL:
-                if (local)
-                    eret |= evtarget->scroll(evtarget, earg) & ~TTK_EV_UNUSED;
+                if (local) eret |= evtarget->scroll(earg) & ~TTK_EV_UNUSED;
                 break;
         }
 
@@ -689,7 +685,7 @@ int ttk_run() {
                     (tick - ttk_button_presstime[*p] >= evtarget->holdtime) &&
                     !ttk_button_holdsent[*p] &&
                     (evtarget->held != ttk_widget_noaction_1)) {
-                    int er = evtarget->held(evtarget, *p);
+                    int er = evtarget->held(*p);
                     if (!(er & TTK_EV_UNUSED)) {
                         eret |= er;
                         ttk_button_holdsent[*p] = 1;
@@ -721,7 +717,7 @@ int ttk_run() {
                     if ((abs(ttk_last_stap - ttk_first_stap) <= 5) &&
                         ((tick - ttk_last_stap_time) <= 400) &&
                         !ttk_ignore_stap) {
-                        eret |= evtarget->stap(evtarget, ttk_first_stap);
+                        eret |= evtarget->stap(ttk_first_stap);
                     }
                     // Even if it didn't match, reset it. Otherwise, no taps
                     // will be recorded once you scroll.
@@ -733,28 +729,28 @@ int ttk_run() {
             if (ev == TTK_BUTTON_UP) {
                 switch (earg) {
                     case '7':
-                        eret |= evtarget->stap(evtarget, 84);
+                        eret |= evtarget->stap(84);
                         break;
                     case '8':
-                        eret |= evtarget->stap(evtarget, 0);
+                        eret |= evtarget->stap(0);
                         break;
                     case '9':
-                        eret |= evtarget->stap(evtarget, 12);
+                        eret |= evtarget->stap(12);
                         break;
                     case '6':
-                        eret |= evtarget->stap(evtarget, 24);
+                        eret |= evtarget->stap(24);
                         break;
                     case '3':
-                        eret |= evtarget->stap(evtarget, 36);
+                        eret |= evtarget->stap(36);
                         break;
                     case '2':
-                        eret |= evtarget->stap(evtarget, 48);
+                        eret |= evtarget->stap(48);
                         break;
                     case '1':
-                        eret |= evtarget->stap(evtarget, 60);
+                        eret |= evtarget->stap(60);
                         break;
                     case '4':
-                        eret |= evtarget->stap(evtarget, 72);
+                        eret |= evtarget->stap(72);
                         break;
                     default:
                         break;
@@ -766,8 +762,7 @@ int ttk_run() {
         /*** Process text input events. ***/
         while (win->inbuf_start != win->inbuf_end) {
             if (win->focus)  // NOT evtarget, that's probably the TI method
-                eret |= win->focus->input(win->focus,
-                                          win->inbuf[win->inbuf_start]) &
+                eret |= win->focus->input(win->inbuf[win->inbuf_start]) &
                         ~TTK_EV_UNUSED;
             win->inbuf_start++;
             win->inbuf_start &= 0x1f;
@@ -883,7 +878,7 @@ int ttk_run() {
                             win->input->y + win->input->h);
             }
 
-            win->input->draw(win->input, s->srf);
+            win->input->draw(s->srf);
 
             ttk_dirty &= ~TTK_DIRTY_INPUT;
             ttk_dirty |= TTK_DIRTY_SCREEN;
@@ -1026,7 +1021,8 @@ extern sdl_additional sdl_add;
 
 void ttk_set_emulation(int w, int h, int bpp) {
 #ifndef IPOD
-    if (!ttk_screen) ttk_screen = malloc(sizeof(struct ttk_screeninfo));
+    if (!ttk_screen)
+        ttk_screen = (ttk_screeninfo*)malloc(sizeof(struct ttk_screeninfo));
 
     ttk_screen->w = ABS(w);
     ttk_screen->h = ABS(h);
@@ -1048,36 +1044,7 @@ void ttk_set_emulation(int w, int h, int bpp) {
 
 ttk_fontinfo* ttk_get_fontlist() { return ttk_fonts; }
 
-TWindow* ttk_new_window() {
-    TWindow* ret = calloc(1, sizeof(TWindow));
-    ret->show_header = 1;
-    ret->titlefree = 0;
-    ret->widgets = 0;
-    ret->x = ttk_screen->wx;
-    ret->y = ttk_screen->wy;
-    ret->w = ttk_screen->w - ttk_screen->wx;
-    ret->h = ttk_screen->h - ttk_screen->wy;
-    ret->color = (ttk_screen->bpp == 16);
-    ret->srf =
-        ttk_new_surface(ttk_screen->w, ttk_screen->h, ret->color ? 16 : 2);
-    ret->background = 0;
-    ret->focus = ret->input = 0;
-    ret->dirty = 0;
-    ret->epoch = ttk_epoch;
-    ret->inbuf_start = ret->inbuf_end = 0;
-    ret->onscreen = 0;
-
-    if (ttk_windows) {
-        ret->title = strdup(ttk_windows->w->title);
-        ret->titlefree = 1;
-    } else {
-        ret->title = "TTK";
-    }
-
-    ttk_fillrect(ret->srf, 0, 0, ret->w, ret->h, ttk_makecol(CKEY));
-
-    return ret;
-}
+TWindow* ttk_new_window() { return new TWindow(); }
 
 void ttk_window_show_header(TWindow* win) {
     if (!win->show_header) {
@@ -1109,30 +1076,14 @@ void ttk_window_hide_header(TWindow* win) {
     }
 }
 
-void ttk_free_window(TWindow* win) {
-    ttk_hide_window(win);
-
-    if (win->widgets) {
-        TWidgetList *cur = win->widgets, *next;
-        while (cur) {
-            next = cur->next;
-            cur->v->win = 0;
-            ttk_free_widget(cur->v);
-            free(cur);
-            cur = next;
-        }
-    }
-    ttk_free_surface(win->srf);
-    if (win->titlefree) free((void*)win->title);
-    free(win);
-}
+void ttk_free_window(TWindow* win) { delete win; }
 
 void ttk_show_window(TWindow* win) {
     if (!win->onscreen) {
         TWindow* oldwindow = ttk_windows ? ttk_windows->w : 0;
         TWindowStack* next = ttk_windows;
         TWidgetList* cur;
-        ttk_windows = malloc(sizeof(struct TWindowStack));
+        ttk_windows = (TWindowStack*)malloc(sizeof(struct TWindowStack));
         ttk_windows->w = win;
         ttk_windows->minimized = 0;
         ttk_windows->next = next;
@@ -1340,7 +1291,7 @@ void ttk_move_window(TWindow* win, int offset, int whence) {
 
     while (cur) {
         if (idx == i) {
-            TWindowStack* s = malloc(sizeof(TWindowStack));
+            TWindowStack* s = (TWindowStack*)malloc(sizeof(TWindowStack));
             if (last)
                 last->next = s;
             else
@@ -1363,7 +1314,7 @@ void ttk_move_window(TWindow* win, int offset, int whence) {
     if (!cur && ttk_windows) {  // index was past end, put it on end
         cur = ttk_windows;
         while (cur->next) cur = cur->next;
-        cur->next = malloc(sizeof(TWindowStack));
+        cur->next = (TWindowStack*)malloc(sizeof(TWindowStack));
         cur->next->w = win;
         cur->next->minimized = minimized;
         cur->next->next = 0;
@@ -1376,7 +1327,7 @@ void ttk_move_window(TWindow* win, int offset, int whence) {
 void ttk_window_title(TWindow* win, const char* str) {
     if (win->titlefree) free((void*)win->title);
 
-    win->title = malloc(strlen(str) + 1);
+    win->title = (const char*)malloc(strlen(str) + 1);
     strcpy((char*)win->title, str);
     win->titlefree = 1;
 
@@ -1391,11 +1342,12 @@ void ttk_add_header_widget(TWidget* wid) {
     wid->win = 0;
 
     if (!ttk_header_widgets) {
-        ttk_header_widgets = current = malloc(sizeof(TWidgetList));
+        ttk_header_widgets = current =
+            (TWidgetList*)malloc(sizeof(TWidgetList));
     } else {
         current = ttk_header_widgets;
         while (current->next) current = current->next;
-        current->next = malloc(sizeof(TWidgetList));
+        current->next = (TWidgetList*)malloc(sizeof(TWidgetList));
         current = current->next;
     }
 
@@ -1424,42 +1376,12 @@ void ttk_remove_header_widget(TWidget* wid) {
     }
 }
 
-TWidget* ttk_new_widget(int x, int y) {
-    TWidget* ret = malloc(sizeof(TWidget));
-    int i;
-    if (!ret) return 0;
-
-    ret->x = x;
-    ret->y = y;
-    ret->w = 0;
-    ret->h = 0;
-    ret->focusable = 0;
-    ret->keyrepeat = 0;
-    ret->rawkeys = 0;
-    ret->framelast = 0;
-    ret->framedelay = 0;
-    ret->timerlast = 0;
-    ret->timerdelay = 0;
-    ret->holdtime = 1000;
-    ret->dirty = 1;
-
-    ret->draw = ttk_widget_nodrawing;
-    ret->button = ttk_widget_noaction_2;
-    ret->down = ret->held = ret->scroll = ret->stap = ttk_widget_noaction_1;
-    ret->input = ttk_widget_noaction_1;
-    ret->frame = ret->timer = ttk_widget_noaction_i0;
-    ret->destroy = ttk_widget_noaction_0;
-    ret->data = ret->data2 = 0;
-
-    return ret;
-}
+TWidget* ttk_new_widget(int x, int y) { return new TWidget(x, y); }
 
 void ttk_free_widget(TWidget* wid) {
     if (!wid) return;
-
-    wid->destroy(wid);
     if (wid->win) ttk_remove_widget(wid->win, wid);
-    free(wid);
+    delete wid;
 }
 
 TWindow* ttk_add_widget(TWindow* win, TWidget* wid) {
@@ -1467,11 +1389,11 @@ TWindow* ttk_add_widget(TWindow* win, TWidget* wid) {
     if (!wid || !win) return win;
 
     if (!win->widgets) {
-        win->widgets = current = malloc(sizeof(TWidgetList));
+        win->widgets = current = (TWidgetList*)malloc(sizeof(TWidgetList));
     } else {
         current = win->widgets;
         while (current->next) current = current->next;
-        current->next = malloc(sizeof(TWidgetList));
+        current->next = (TWidgetList*)malloc(sizeof(TWidgetList));
         current = current->next;
     }
 
@@ -1833,7 +1755,7 @@ ttk_timer ttk_create_timer(int ms, void (*fn)()) {
     if (!head || ++num > TIMER_ALLOCD) {
         int a = head ? TIMER_ALLOCD + 64 : 63;
         /* if this realloc relocates the memory, all timers are screwed. */
-        cur = realloc(head, (a + 1) * sizeof(struct _ttk_timer));
+        cur = (ttk_timer)realloc(head, (a + 1) * sizeof(struct _ttk_timer));
         if (head && cur != head) {
             fprintf(stderr,
                     "realloc relocated timers. All timers are now "
