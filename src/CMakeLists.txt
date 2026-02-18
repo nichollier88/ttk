@@ -33,7 +33,14 @@ endif()
 
 # Sources
 set(TTK_SOURCES
-    ttk.c
+    ttk_core.c
+    ttk_window.c
+    ttk_widget.c
+    ttk_font.c
+    ttk_input.c
+    ttk_timer.c
+    ttk_hw.c
+    ttk_priv.h
     menu.c
     icons.c
     slider.c
@@ -43,6 +50,18 @@ set(TTK_SOURCES
     mwin-emu.c
     gradient.c
 )
+
+# set(TTK_SOURCES
+#     ttk.c
+#     menu.c
+#     icons.c
+#     slider.c
+#     imgview.c
+#     textarea.c
+#     ${FLEX_SOURCE}
+#     mwin-emu.c
+#     gradient.c
+# )
 
 if(TTF)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL_ttf.c")
@@ -150,6 +169,6 @@ endif()
 # Examples
 set(EXAMPLES exscroll exmenu eximage exti)
 foreach(EX ${EXAMPLES})
-    add_executable(${EX} ${EX}.c)
+    add_executable(${EX} examples/${EX}.c)
     target_link_libraries(${EX} ttk ${TTK_LIBS})
 endforeach()

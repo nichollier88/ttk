@@ -25,6 +25,7 @@
 #include <sys/types.h>
 
 #include "ttk.h"
+
 #ifdef SDL
 
 typedef struct Bitmap_Font {

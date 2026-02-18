@@ -4,8 +4,8 @@ project(ttk_root)
 
 option(BUILD_LNDIR "Build lndir utility" OFF)
 
-# add_subdirectory(src)
-add_subdirectory(src_cpp)
+add_subdirectory(src)
+# add_subdirectory(src_cpp)
 
 if(BUILD_LNDIR)
     add_executable(lndir lndir.c)
