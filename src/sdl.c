@@ -52,6 +52,7 @@ typedef struct sdl_additional {
 
 sdl_additional sdl_add;
 
+/* Sets up a grayscale palette for 2bpp simulation on 8bpp surfaces */
 static void palettize(SDL_Surface* srf) {
     if (ttk_screen->bpp == 2) {
         int grp;
@@ -64,6 +65,7 @@ static void palettize(SDL_Surface* srf) {
     }
 }
 
+/* Initialize SDL video, timer, and set up the screen surface */
 void ttk_gfx_init() {
 #ifdef IPOD
 #define NOPAR 0
@@ -108,6 +110,7 @@ void ttk_gfx_quit() { SDL_Quit(); }
 
 void ttk_gfx_update(ttk_surface srf) { SDL_Flip(srf); }
 
+/* Polls for a raw SDL event, handling basic key mapping */
 int ttk_get_rawevent(int* arg) {
     SDL_Event ev;
     int tev = TTK_NO_EVENT;
@@ -152,6 +155,7 @@ int ttk_get_rawevent(int* arg) {
 /* available image types */
 #define TTK_IMAGE_PPM (0) /* PPM only for now */
 
+/* Internal helper to save a surface as a PPM image */
 int _internal_save_image(char* filename, ttk_surface srf, int type) {
     /* note - heavily based on/copied from FXB's capture module */
     int x, y, w, h;
@@ -185,6 +189,7 @@ int _internal_save_image(char* filename, ttk_surface srf, int type) {
     return 0;
 }
 
+/* Saves a screenshot to a file named Screen_XXXX.ppm */
 void _internal_save_screenshot(void) {
     int retval = 0;
     int picno = 0;
@@ -211,6 +216,7 @@ void _internal_save_screenshot(void) {
 }
 #endif
 
+/* Waits for an event or timeout */
 static int wait_event(SDL_Event* e, unsigned int ms) {
     unsigned int time = SDL_GetTicks();
     while (SDL_GetTicks() < time + ms) {
@@ -220,6 +226,11 @@ static int wait_event(SDL_Event* e, unsigned int ms) {
     return 0;
 }
 
+/*
+ * High-level event retrieval.
+ * Maps SDL input (keyboard/mouse) to TTK specific events (buttons, scroll).
+ * Includes logic to amalgamate scroll events to reduce lag.
+ */
 int ttk_get_event(int* arg) {
 #define TIME 30
     static SDL_Event ev;
@@ -371,10 +382,12 @@ void ttk_delay(int ms) { SDL_Delay(ms); }
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #endif
 
+/* Creates a color value from RGB components */
 ttk_color ttk_makecol(int r, int g, int b) {
     return ttk_makecol_ex(r, g, b, 0);
 }
 
+/* Creates a color value from RGB components for a specific surface */
 ttk_color ttk_makecol_ex(int r, int g, int b, ttk_surface srf) {
     if (ttk_screen->bpp == 2) {
         int hue;
@@ -401,9 +414,12 @@ ttk_color ttk_makecol_ex(int r, int g, int b, ttk_surface srf) {
     }
 }
 
+/* Extracts RGB components from a color value */
 void ttk_unmakecol(ttk_color col, int* r, int* g, int* b) {
     ttk_unmakecol_ex(col, r, g, b, 0);
 }
+
+/* Extracts RGB components from a color value for a specific surface */
 void ttk_unmakecol_ex(ttk_color col, int* r, int* g, int* b, ttk_surface srf) {
     if (!srf) srf = ttk_screen->srf;
     if (ttk_screen->bpp == 2) {
@@ -422,6 +438,7 @@ void ttk_unmakecol_ex(ttk_color col, int* r, int* g, int* b, ttk_surface srf) {
     }
 }
 
+/* Graphics Context (GC) management functions */
 ttk_gc ttk_new_gc() { return (ttk_gc)calloc(1, sizeof(struct _ttk_gc)); }
 ttk_gc ttk_copy_gc(ttk_gc other) {
     ttk_gc ret = malloc(sizeof(struct _ttk_gc));
@@ -438,6 +455,7 @@ void ttk_gc_set_usebg(ttk_gc gc, int flag) { gc->usebg = flag; }
 void ttk_gc_set_xormode(ttk_gc gc, int flag) { gc->xormode = flag; }
 void ttk_free_gc(ttk_gc gc) { free(gc); }
 
+/* Helper to convert ttk_color to Uint32 for SDL_gfx primitives */
 static int fetchcolor(ttk_color col) {
     int ret = 0;
     Uint8 r, g, b;
@@ -451,6 +469,7 @@ static int fetchcolor(ttk_color col) {
     return ret;
 }
 
+/* Get pixel value at (x, y) */
 ttk_color ttk_getpixel(ttk_surface srf, int x, int y) {
     switch (srf->format->BytesPerPixel) {
         case 1:
@@ -463,6 +482,8 @@ ttk_color ttk_getpixel(ttk_surface srf, int x, int y) {
             return ttk_makecol_ex(255, 0, 255, srf);
     }
 }
+
+/* Set pixel at (x, y) */
 void ttk_pixel(ttk_surface srf, int x, int y, ttk_color col) {
     if (ttk_screen->bpp == 2)
         pixelByte(srf, x, y, col);
@@ -476,6 +497,7 @@ void ttk_pixel_gc(ttk_surface srf, ttk_gc gc, int x, int y) {
         pixelColor(srf, x, y, fetchcolor(gc->fg));
 }
 
+/* Draw a line */
 void ttk_line(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
     if (ttk_screen->bpp == 2)
         lineByte(srf, x1, y1, x2, y2, col);
@@ -488,6 +510,8 @@ void ttk_line_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
     else
         lineColor(srf, x1, y1, x2, y2, fetchcolor(gc->fg));
 }
+
+/* Draw an anti-aliased line */
 void ttk_aaline(ttk_surface srf, int x1, int y1, int x2, int y2,
                 ttk_color col) {
     if (ttk_screen->bpp == 2)
@@ -502,6 +526,7 @@ void ttk_aaline_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
         aalineColor(srf, x1, y1, x2, y2, fetchcolor(gc->fg));
 }
 
+/* Draw a rectangle outline */
 void ttk_rect(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
     if (ttk_screen->bpp == 2)
         rectangleByte(srf, x1, y1, x2, y2, col);
@@ -514,6 +539,8 @@ void ttk_rect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
     else
         rectangleColor(srf, x, y, x + w, y + h, fetchcolor(gc->fg));
 }
+
+/* Draw a filled rectangle */
 void ttk_fillrect(ttk_surface srf, int x1, int y1, int x2, int y2,
                   ttk_color col) {
     if (ttk_screen->bpp == 2)
@@ -521,6 +548,8 @@ void ttk_fillrect(ttk_surface srf, int x1, int y1, int x2, int y2,
     else
         boxColor(srf, x1, y1, x2, y2, fetchcolor(col));
 }
+
+/* Draw a filled rectangle using GC, supporting XOR mode */
 void ttk_fillrect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
     if (gc->xormode) {
         int x1 = x, x2 = x + w, y1 = y, y2 = y + h;
@@ -568,6 +597,7 @@ void ttk_fillrect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
 
 extern unsigned char ttk_chamfering[][10];
 
+/* Draws a gradient with optional rounded corners (chamfering) */
 void ttk_do_gradient(ttk_surface srf, char horiz, int b_rad, int e_rad, int x1,
                      int y1, int x2, int y2, ttk_color begin, ttk_color end) {
     gradient_node* gn = ttk_gradient_find_or_add(begin, end);
@@ -618,6 +648,7 @@ void ttk_vgradient(ttk_surface srf, int x1, int y1, int x2, int y2,
     ttk_do_gradient(srf, 0, 0, 0, x1, y1, x2, y2, top, bottom);
 }
 
+/* Draw a polygon */
 void ttk_poly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
     if (ttk_screen->bpp == 2)
         polygonByte(srf, (Sint16*)vx, (Sint16*)vy, nv, col);
@@ -650,6 +681,7 @@ void ttk_poly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_poly_pt(srf, v, n, gc->fg);
 }
 
+/* Draw an anti-aliased polygon */
 void ttk_aapoly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
     if (ttk_screen->bpp == 2)
         aapolygonByte(srf, (Sint16*)vx, (Sint16*)vy, nv, col);
@@ -682,6 +714,7 @@ void ttk_aapoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_aapoly_pt(srf, v, n, gc->fg);
 }
 
+/* Draw a polyline (open polygon) */
 void ttk_polyline(ttk_surface srf, int nv, short* vx, short* vy,
                   ttk_color col) {
     if (ttk_screen->bpp == 2)
@@ -715,6 +748,7 @@ void ttk_polyline_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_polyline_pt(srf, v, n, gc->fg);
 }
 
+/* Macro for Bezier curve calculation */
 #define DO_BEZIER(function)                                                   \
     /*  Note: I don't think there is any great performance win in             \
      *  translating this to fixed-point integer math, most of the time        \
@@ -777,6 +811,7 @@ void ttk_polyline_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
         yp = y;                                                               \
     }
 
+/* Draw a Bezier curve */
 void ttk_bezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3, int y3,
                 int x4, int y4, int level, ttk_color col) {
     DO_BEZIER(ttk_line(srf, (short)xp, (short)yp, (short)x, (short)y, col));
@@ -786,6 +821,7 @@ void ttk_bezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
     ttk_bezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
 }
 
+/* Draw an anti-aliased Bezier curve */
 void ttk_aabezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3,
                   int y3, int x4, int y4, int level, ttk_color col) {
     DO_BEZIER(ttk_aaline(srf, (short)xp, (short)yp, (short)x, (short)y, col));
@@ -795,6 +831,7 @@ void ttk_aabezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
     ttk_aabezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
 }
 
+/* Draw a filled polygon */
 void ttk_fillpoly(ttk_surface srf, int nv, short* vx, short* vy,
                   ttk_color col) {
     if (ttk_screen->bpp == 2)
@@ -828,6 +865,7 @@ void ttk_fillpoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_fillpoly_pt(srf, v, n, gc->fg);
 }
 
+/* Draw an ellipse or circle */
 void ttk_ellipse(ttk_surface srf, int x, int y, int rx, int ry, ttk_color col) {
     if (rx == ry) {
         if (ttk_screen->bpp == 2)
@@ -855,6 +893,7 @@ void ttk_ellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx, int ry) {
     }
 }
 
+/* Draw an anti-aliased ellipse or circle */
 void ttk_aaellipse(ttk_surface srf, int x, int y, int rx, int ry,
                    ttk_color col) {
     if (rx == ry) {
@@ -884,6 +923,7 @@ void ttk_aaellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
     }
 }
 
+/* Draw a filled ellipse or circle */
 void ttk_fillellipse(ttk_surface srf, int x, int y, int rx, int ry,
                      ttk_color col) {
     if (rx == ry) {
@@ -913,6 +953,7 @@ void ttk_fillellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
     }
 }
 
+/* Custom implementation to draw an anti-aliased filled ellipse */
 void ttk_aafillellipse(ttk_surface srf, int xc, int yc, int rx, int ry,
                        ttk_color col) {
     Sint16 left, right, top, bottom;
@@ -1125,6 +1166,7 @@ void ttk_aafillellipse_gc(ttk_surface srf, ttk_gc gc, int xc, int yc, int rx,
 
 /**** Font stuff. Taken from Microwindows with minor modifications. ****/
 
+/* Helper functions to read data types from a file */
 static int read8(FILE* fp, unsigned char* cp) {
     int c;
     if ((c = getc(fp)) == EOF) return 0;
@@ -1171,6 +1213,7 @@ static int readstr_padded(FILE* fp, char* buf, int totlen) {
 
 /* Mostly copied from mwin */
 #define FNT_VERSION "RB11"
+/* Loads a .fnt bitmap font file */
 static void load_fnt(Bitmap_Font* bf, const char* fname) {
     FILE* fp = fopen(fname, "rb");
     int i;
@@ -1583,6 +1626,7 @@ static int pcf_read_toc(FILE* file, struct toc_entry** toc,
     return 0;
 }
 
+/* Loads a PCF font file. Logic adapted from Microwindows/Free86 PCF code. */
 static void load_pcf(Bitmap_Font* bf, const char* fname) {
     FILE* file = 0;
     int offset, i, count, bsize, bwidth, err = 0;
@@ -1735,6 +1779,7 @@ leave_func:
 
 /**** End MW copied font handling stuff. ****/
 
+/* Helper to convert hex string to integer */
 static int h2d(char* s, int len) {
     int i, ret = 0;
     for (i = 0; i < len; ++i) {
@@ -1747,6 +1792,7 @@ static int h2d(char* s, int len) {
     return ret;
 }
 
+/* Loads a .fff bitmap font file */
 static void load_fff(Bitmap_Font* bf, const char* fname) {
     char tmp[1024], res;
     FILE* ip;
@@ -1789,6 +1835,7 @@ static void load_fff(Bitmap_Font* bf, const char* fname) {
 }
 
 #ifndef NO_SF
+/* SFont drawing and width functions */
 static void draw_sf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
                     const char* str) {
     Uint8 r, g, b;
@@ -1842,6 +1889,7 @@ static void free_sf(ttk_font f) {
 #endif
 
 #ifndef NO_TF
+/* SDL_ttf drawing and width functions */
 #define TF_FUNC(name, type, func)                                    \
     static void name##_tf(ttk_font f, ttk_surface srf, int x, int y, \
                           ttk_color col, const type* str) {          \
@@ -1883,6 +1931,7 @@ static void free_tf(ttk_font f) { TTF_CloseFont(f->tf); }
 #endif
 
 /**** More stuff from microwin. src/drivers/genfont.c ****/
+/* Generic bitmap font text size calculation */
 static void gen_gettextsize(Bitmap_Font* bf, const void* text, int cc,
                             int* pwidth, int* pheight, int* pbase) {
     const unsigned char* str = text;
@@ -1924,6 +1973,7 @@ static void gen16_gettextsize(Bitmap_Font* bf, const unsigned short* str,
     *pbase = bf->ascent;
 }
 
+/* Generic bitmap font glyph retrieval */
 static void gen_gettextbits(Bitmap_Font* bf, int ch,
                             const unsigned short** retmap, int* pwidth,
                             int* pheight, int* pbase) {
@@ -1958,6 +2008,7 @@ static void gen_gettextbits(Bitmap_Font* bf, int ch,
 }
 
 /** src/engine/devdraw.c, modified for SDL **/
+/* Draws a bitmap to the surface */
 static void draw_bitmap(ttk_surface srf, int x, int y, int width, int height,
                         const unsigned short* imagebits, ttk_color color) {
     int minx, maxx;
@@ -2000,6 +2051,7 @@ void ttk_bitmap_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h,
 }
 
 /** src/engine/devfont.c **/
+/* Core routine to draw text using a bitmap font */
 static void corefont_drawtext(Bitmap_Font* bf, ttk_surface srf, int x, int y,
                               const void* text, int cc, ttk_color col) {
     const unsigned char* str = text;
@@ -2041,6 +2093,7 @@ static void corefont16_drawtext(Bitmap_Font* bf, ttk_surface srf, int x, int y,
 
 /**** end mwin copied stuff ****/
 
+/* Checks if a string is pure ASCII */
 static int IsASCII(const char* str) {
     const char* p = str;
     while (*p) {
@@ -2050,6 +2103,7 @@ static int IsASCII(const char* str) {
     return 1;
 }
 
+/* Converts UTF-8 string to 16-bit Unicode */
 static int ConvertUTF8(const unsigned char* src, unsigned short* dst) {
     const unsigned char* sp = src;
     unsigned short* dp = dst;
@@ -2114,6 +2168,7 @@ static int ConvertUTF8(const unsigned char* src, unsigned short* dst) {
     return len;
 }
 
+/* Bitmap font drawing wrapper (handles UTF-8 conversion if needed) */
 static void draw_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
                     const char* str) {
     const void* text = (const void*)str;
@@ -2149,6 +2204,7 @@ static void uc16_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
     corefont16_drawtext(f->bf, srf, x, y, str, cc, col);
 }
 
+/* Bitmap font width calculation wrapper */
 static int width_bf(ttk_font f, const char* str) {
     int width, height, base;
     if (!f->bf) return -1;
@@ -2188,6 +2244,7 @@ static void free_bf(ttk_font f) {
     f->bf = 0;
 }
 
+/* TTK Text drawing functions */
 void ttk_text(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
               const char* str) {
     fnt->draw(fnt, srf, x, y + fnt->ofs, col, str);
@@ -2217,6 +2274,7 @@ int ttk_text_width_gc(ttk_gc gc, const char* str) {
 }
 int ttk_text_height(ttk_font fnt) { return fnt->height; }
 int ttk_text_height_gc(ttk_gc gc) { return gc->font->height; }
+/* Formatted text drawing */
 void ttk_textf(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
                const char* fmt, ...) {
     static char* buffer;
@@ -2229,6 +2287,15 @@ void ttk_textf(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
     va_end(ap);
     fnt->draw(fnt, srf, x, y + fnt->ofs, col, buffer);
 }
+/*
+ * Loads a font from various supported formats.
+ * Tries extensions in order:
+ * 1. .png (SFont)
+ * 2. .ttf (SDL_ttf)
+ * 3. .fnt (Bitmap)
+ * 4. .pcf (Bitmap)
+ * 5. .fff (Bitmap)
+ */
 void ttk_load_font(ttk_fontinfo* fi, const char* fnbase, int size) {
     char* fname = alloca(strlen(fnbase) + 7); /* +7: - i . p n g \0 */
     struct stat st;
@@ -2329,6 +2396,7 @@ void ttk_unload_font(ttk_fontinfo* fi) {
     fi->good = 0;
 }
 
+/* Draws text using the Graphics Context settings */
 void ttk_text_gc(ttk_surface srf, ttk_gc gc, int x, int y, const char* str) {
     if (gc->usebg) {
         ttk_fillrect(srf, x, y, x + ttk_text_width_gc(gc, str),
@@ -2358,6 +2426,7 @@ void ttk_blit_image_ex(ttk_surface src, int sx, int sy, int sw, int sh,
     SDL_BlitSurface(src, &sr, dst, &dr);
 }
 
+/* Creates a new SDL surface with the specified dimensions and depth */
 ttk_surface ttk_new_surface(int w, int h, int bpp) {
     SDL_Surface* ret;
     int Rmask, Gmask, Bmask, Amask = 0, BPP;
@@ -2400,6 +2469,7 @@ ttk_surface ttk_new_surface(int w, int h, int bpp) {
     return ret;
 }
 
+/* Scales a surface by a factor */
 ttk_surface ttk_scale_surface(ttk_surface srf, float factor) {
     if (ttk_screen->bpp >= 16) {
         return zoomSurface(srf, factor, factor, 1);
