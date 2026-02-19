@@ -5,7 +5,7 @@
  * Replaces sdl.c for this specific hardware.
  */
 
-#include <bcm2835.h>
+#include <lgpio.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,25 +51,28 @@ typedef struct sdl_additional {
 
 sdl_additional sdl_add = {0, 0};
 
+int GPIO_Handle;
+int SPI_Handle;
+
 // --- Hardware Interface ---
 
 static void LCD_Write_Command(uint8_t cmd) {
-    bcm2835_gpio_write(LCD_DC, LOW);
-    bcm2835_spi_transfer(cmd);
+    lgGpioWrite(GPIO_Handle, LCD_DC, 0);
+    lgSpiWrite(SPI_Handle, (char*)&cmd, 1);
 }
 
 static void LCD_Write_Data(uint8_t data) {
-    bcm2835_gpio_write(LCD_DC, HIGH);
-    bcm2835_spi_transfer(data);
+    lgGpioWrite(GPIO_Handle, LCD_DC, 1);
+    lgSpiWrite(SPI_Handle, (char*)&data, 1);
 }
 
 static void LCD_Init_Reg(void) {
     // ST7735S initialization sequence
     LCD_Write_Command(ST7735_SWRESET);
-    bcm2835_delay(120);
+    lguSleep(0.120);
 
     LCD_Write_Command(ST7735_SLPOUT);
-    bcm2835_delay(120);
+    lguSleep(0.120);
 
     LCD_Write_Command(0xB1); // Frame Rate Control 1
     LCD_Write_Data(0x01);
@@ -124,7 +127,7 @@ static void LCD_Init_Reg(void) {
     LCD_Write_Data(0x05); // 16-bit/pixel
 
     LCD_Write_Command(ST7735_DISPON); // Display On
-    bcm2835_delay(100);
+    lguSleep(0.100);
 }
 
 static void LCD_SetWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
@@ -150,38 +153,55 @@ static void LCD_SetWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
 // --- TTK Backend Implementation ---
 
 void ttk_gfx_init() {
-    if (!bcm2835_init()) {
-        fprintf(stderr, "bcm2835_init failed. Are you running as root?\n");
+    char buffer[128];
+    FILE *fp;
+
+    fp = popen("cat /proc/cpuinfo | grep 'Raspberry Pi 5'", "r");
+    if (fp == NULL) {
+        fprintf(stderr, "It is not possible to determine the model of the Raspberry PI\n");
         exit(1);
     }
 
+    if(fgets(buffer, sizeof(buffer), fp) != NULL) {
+        GPIO_Handle = lgGpiochipOpen(4);
+        if (GPIO_Handle < 0) {
+            fprintf(stderr, "gpiochip4 Export Failed\n");
+            exit(1);
+        }
+    } else {
+        GPIO_Handle = lgGpiochipOpen(0);
+        if (GPIO_Handle < 0) {
+            fprintf(stderr, "gpiochip0 Export Failed\n");
+            exit(1);
+        }
+    }
+    pclose(fp);
+
     // Init SPI
-    bcm2835_spi_begin();
-    bcm2835_spi_setBitOrder(BCM2835_SPI_BIT_ORDER_MSBFIRST);
-    bcm2835_spi_setDataMode(BCM2835_SPI_MODE0);
-    bcm2835_spi_setClockDivider(BCM2835_SPI_CLOCK_DIVIDER_16);
-    bcm2835_spi_chipSelect(BCM2835_SPI_CS0);
-    bcm2835_spi_setChipSelectPolarity(BCM2835_SPI_CS0, LOW);
+    SPI_Handle = lgSpiOpen(0, 0, 10000000, 0);
+    if (SPI_Handle < 0) {
+        fprintf(stderr, "lgSpiOpen Failed\n");
+        exit(1);
+    }
 
     // Init GPIOs
-    bcm2835_gpio_fsel(LCD_RST, BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(LCD_DC, BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(LCD_BL, BCM2835_GPIO_FSEL_OUTP);
+    lgGpioClaimOutput(GPIO_Handle, 0, LCD_RST, 0);
+    lgGpioClaimOutput(GPIO_Handle, 0, LCD_DC, 0);
+    lgGpioClaimOutput(GPIO_Handle, 0, LCD_BL, 0);
 
     int inputs[] = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_PRESS, KEY1, KEY2, KEY3};
     for (int i = 0; i < 8; i++) {
-        bcm2835_gpio_fsel(inputs[i], BCM2835_GPIO_FSEL_INPT);
-        bcm2835_gpio_set_pud(inputs[i], BCM2835_GPIO_PUD_UP);
+        lgGpioClaimInput(GPIO_Handle, 0, inputs[i]);
     }
 
     // Reset LCD
-    bcm2835_gpio_write(LCD_BL, HIGH);
-    bcm2835_gpio_write(LCD_RST, HIGH);
-    bcm2835_delay(100);
-    bcm2835_gpio_write(LCD_RST, LOW);
-    bcm2835_delay(100);
-    bcm2835_gpio_write(LCD_RST, HIGH);
-    bcm2835_delay(100);
+    lgGpioWrite(GPIO_Handle, LCD_BL, 1);
+    lgGpioWrite(GPIO_Handle, LCD_RST, 1);
+    lguSleep(0.100);
+    lgGpioWrite(GPIO_Handle, LCD_RST, 0);
+    lguSleep(0.100);
+    lgGpioWrite(GPIO_Handle, LCD_RST, 1);
+    lguSleep(0.100);
 
     LCD_Init_Reg();
 
@@ -207,8 +227,8 @@ void ttk_gfx_init() {
 }
 
 void ttk_gfx_quit() {
-    bcm2835_spi_end();
-    bcm2835_close();
+    lgSpiClose(SPI_Handle);
+    lgGpiochipClose(GPIO_Handle);
     SDL_Quit();
 }
 
@@ -218,7 +238,7 @@ void ttk_gfx_update(ttk_surface srf) {
     if (SDL_MUSTLOCK(srf)) SDL_LockSurface(srf);
 
     LCD_SetWindow(0, 0, 127, 127);
-    bcm2835_gpio_write(LCD_DC, HIGH);
+    lgGpioWrite(GPIO_Handle, LCD_DC, 1);
     
     uint16_t *pixels = (uint16_t*)srf->pixels;
     int count = 128 * 128;
@@ -231,7 +251,7 @@ void ttk_gfx_update(ttk_surface srf) {
         buffer[i*2+1] = p & 0xFF;
     }
     
-    bcm2835_spi_transfern((char*)buffer, count * 2);
+    lgSpiWrite(SPI_Handle, (char*)buffer, count * 2);
 
     if (SDL_MUSTLOCK(srf)) SDL_UnlockSurface(srf);
 }
@@ -257,15 +277,15 @@ int ttk_get_event(int* arg) {
     
     for (int i = 0; i < 8; i++) {
         int pin = buttons[i];
-        int val = bcm2835_gpio_lev(pin); // Active LOW
+        int val = lgGpioRead(GPIO_Handle, pin); // Active LOW
         int ttk_btn = ttk_btns[i];
         
-        if (val == LOW && button_states[ttk_btn] == 0) {
+        if (val == 0 && button_states[ttk_btn] == 0) {
             button_states[ttk_btn] = 1;
             *arg = ttk_btn;
             return TTK_BUTTON_DOWN;
         }
-        if (val == HIGH && button_states[ttk_btn] == 1) {
+        if (val == 1 && button_states[ttk_btn] == 1) {
             button_states[ttk_btn] = 0;
             *arg = ttk_btn;
             return TTK_BUTTON_UP;
