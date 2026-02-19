@@ -6,16 +6,20 @@
  */
 
 #include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <lgpio.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include "ttk.h"
 #include "ttk/SDL_gfxPrimitives.h"
 #include "ttk/SDL_rotozoom.h"
+#include "ttk/SFont.h"
 
 // Waveshare 1.44inch LCD HAT GPIOs (BCM)
 #define LCD_CS 8
@@ -456,6 +460,42 @@ void ttk_vgradient(ttk_surface srf, int x1, int y1, int x2, int y2,
     ttk_do_gradient(srf, 0, 0, 0, x1, y1, x2, y2, top, bottom);
 }
 
+static void draw_bitmap(ttk_surface srf, int x, int y, int width, int height,
+                        const unsigned short* imagebits, ttk_color color) {
+    int minx, maxx;
+    unsigned short bitvalue = 0;
+    int bitcount;
+
+    minx = x;
+    maxx = x + width - 1;
+    bitcount = 0;
+    while (height > 0) {
+        if (bitcount <= 0) {
+            bitcount = 16;
+            bitvalue = *imagebits++;
+        }
+        if (bitvalue & (1 << 15)) pixelColor(srf, x, y, fetchcolor(color));
+        bitvalue <<= 1;
+        bitcount--;
+
+        if (x++ == maxx) {
+            x = minx;
+            y++;
+            --height;
+            bitcount = 0;
+        }
+    }
+}
+
+void ttk_bitmap(ttk_surface srf, int x, int y, int w, int h,
+                unsigned short* imagebits, ttk_color col) {
+    draw_bitmap(srf, x, y, w, h, imagebits, col);
+}
+void ttk_bitmap_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h,
+                   unsigned short* imagebits) {
+    draw_bitmap(srf, x, y, w, h, imagebits, gc->fg);
+}
+
 void ttk_poly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
     polygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
 }
@@ -699,32 +739,574 @@ void ttk_aafillellipse_gc(ttk_surface srf, ttk_gc gc, int xc, int yc, int rx,
     ttk_aafillellipse(srf, xc, yc, rx, ry, gc->fg);
 }
 
-// Font loading stubs (simplified for brevity, assumes SDL_ttf or SFont
-// available) For full functionality, copy load_fnt/pcf/fff from sdl.c
+typedef struct Bitmap_Font {
+    char* name;
+    int maxwidth;
+    unsigned int height;
+    int ascent;
+    int firstchar;
+    int size;
+    const unsigned short* bits;
+    const unsigned long* offset;
+    const unsigned char* width;
+    int defaultchar;
+    long bits_size;
+} Bitmap_Font;
+
+static int read8(FILE* fp, unsigned char* cp) {
+    int c;
+    if ((c = getc(fp)) == EOF) return 0;
+    *cp = (unsigned char)c;
+    return 1;
+}
+static int read16(FILE* fp, unsigned short* sp) {
+    int c;
+    unsigned short s = 0;
+    if ((c = getc(fp)) == EOF) return 0;
+    s |= (c & 0xff);
+    if ((c = getc(fp)) == EOF) return 0;
+    s |= (c & 0xff) << 8;
+    *sp = s;
+    return 1;
+}
+static int read32(FILE* fp, unsigned long* lp) {
+    int c;
+    unsigned long l = 0;
+    if ((c = getc(fp)) == EOF) return 0;
+    l |= (c & 0xff);
+    if ((c = getc(fp)) == EOF) return 0;
+    l |= (c & 0xff) << 8;
+    if ((c = getc(fp)) == EOF) return 0;
+    l |= (c & 0xff) << 16;
+    if ((c = getc(fp)) == EOF) return 0;
+    l |= (c & 0xff) << 24;
+    *lp = l;
+    return 1;
+}
+static int readstr(FILE* fp, char* buf, int count) {
+    return fread(buf, 1, count, fp);
+}
+static int readstr_padded(FILE* fp, char* buf, int totlen) {
+    char* p;
+    if (fread(buf, 1, totlen, fp) != totlen) return 0;
+
+    p = &buf[totlen];
+    *p-- = 0;
+    while (*p == ' ' && p >= buf) *p-- = 0;
+
+    return totlen;
+}
+
+#define FNT_VERSION "RB11"
+static void load_fnt(Bitmap_Font* bf, const char* fname) {
+    FILE* fp = fopen(fname, "rb");
+    int i;
+    unsigned short maxwidth, height, ascent, pad;
+    unsigned long firstchar, defaultchar, size;
+    unsigned long nbits, noffset, nwidth;
+    char version[5];
+    char name[65];
+    char copyright[257];
+
+    if (!fp) {
+        fprintf(stderr, "Couldn't find font file %s; exiting.\n", fname);
+        exit(1);
+    }
+
+    memset(version, 0, sizeof(version));
+    if (readstr(fp, version, 4) != 4) goto errout;
+    if (strcmp(version, FNT_VERSION) != 0) goto errout;
+
+    if (readstr_padded(fp, name, 64) != 64) goto errout;
+    bf->name = (char*)malloc(strlen(name) + 1);
+    if (!bf->name) goto errout;
+    strcpy(bf->name, name);
+
+    if (readstr_padded(fp, copyright, 256) != 256) goto errout;
+
+    if (!read16(fp, &maxwidth)) goto errout;
+    bf->maxwidth = maxwidth;
+    if (!read16(fp, &height)) goto errout;
+    bf->height = height;
+    if (!read16(fp, &ascent)) goto errout;
+    bf->ascent = ascent;
+    if (!read16(fp, &pad)) goto errout;
+    if (!read32(fp, &firstchar)) goto errout;
+    bf->firstchar = firstchar;
+    if (!read32(fp, &defaultchar)) goto errout;
+    bf->defaultchar = defaultchar;
+    if (!read32(fp, &size)) goto errout;
+    bf->size = size;
+
+    if (!read32(fp, &nbits)) goto errout;
+    bf->bits = (unsigned short*)malloc(nbits * sizeof(unsigned short));
+    if (!bf->bits) goto errout;
+    bf->bits_size = nbits;
+
+    if (!read32(fp, &noffset)) goto errout;
+    if (noffset) {
+        bf->offset = (unsigned long*)malloc(noffset * sizeof(unsigned long));
+        if (!bf->offset) goto errout;
+    }
+
+    if (!read32(fp, &nwidth)) goto errout;
+    if (nwidth) {
+        bf->width = (unsigned char*)malloc(nwidth * sizeof(unsigned char));
+        if (!bf->width) goto errout;
+    }
+
+    for (i = 0; i < nbits; ++i)
+        if (!read16(fp, (unsigned short*)&bf->bits[i])) goto errout;
+    if (ftell(fp) & 02)
+        if (!read16(fp, (unsigned short*)&bf->bits[i])) goto errout;
+    if (noffset)
+        for (i = 0; i < bf->size; ++i)
+            if (!read32(fp, (unsigned long*)&bf->offset[i])) goto errout;
+    if (nwidth)
+        for (i = 0; i < bf->size; ++i)
+            if (!read8(fp, (unsigned char*)&bf->width[i])) goto errout;
+
+    fclose(fp);
+    return;
+
+errout:
+    fclose(fp);
+    if (!bf) return;
+    if (bf->name) free(bf->name);
+    if (bf->bits) free((char*)bf->bits);
+    if (bf->offset) free((char*)bf->offset);
+    if (bf->width) free((char*)bf->width);
+    fprintf(stderr, "Error in font file %s - possibly truncated.\n", fname);
+    exit(1);
+}
+
+static void gen_gettextsize(Bitmap_Font* bf, const void* text, int cc,
+                            int* pwidth, int* pheight, int* pbase) {
+    const unsigned char* str = text;
+    unsigned int c;
+    int width;
+
+    if (bf->width == NULL)
+        width = cc * bf->maxwidth;
+    else {
+        width = 0;
+        while (--cc >= 0) {
+            c = *str++;
+            if (c >= bf->firstchar && c < bf->firstchar + bf->size)
+                width += bf->width[c - bf->firstchar];
+        }
+    }
+    *pwidth = width;
+    *pheight = bf->height;
+    *pbase = bf->ascent;
+}
+
+static void gen16_gettextsize(Bitmap_Font* bf, const unsigned short* str,
+                              int cc, int* pwidth, int* pheight, int* pbase) {
+    unsigned int c;
+    int width;
+
+    if (bf->width == NULL)
+        width = cc * bf->maxwidth;
+    else {
+        width = 0;
+        while (--cc >= 0) {
+            c = *str++;
+            if (c >= bf->firstchar && c < bf->firstchar + bf->size)
+                width += bf->width[c - bf->firstchar];
+        }
+    }
+    *pwidth = width;
+    *pheight = bf->height;
+    *pbase = bf->ascent;
+}
+
+static void gen_gettextbits(Bitmap_Font* bf, int ch,
+                            const unsigned short** retmap, int* pwidth,
+                            int* pheight, int* pbase) {
+    int count, width;
+    const unsigned short* bits;
+
+    if (ch < bf->firstchar || ch >= bf->firstchar + bf->size)
+        ch = bf->firstchar;
+
+    ch -= bf->firstchar;
+
+    if (bf->offset) {
+        if (((unsigned long*)bf->offset)[0] >= 0x00010000)
+            bits = bf->bits + ((unsigned short*)bf->offset)[ch];
+        else
+            bits = bf->bits + ((unsigned long*)bf->offset)[ch];
+    } else
+        bits = bf->bits + (bf->height * ch);
+
+    width = bf->width ? bf->width[ch] : bf->maxwidth;
+    count = ((width + 15) / 16) * bf->height;
+
+    *retmap = bits;
+
+    *pwidth = width;
+    *pheight = bf->height;
+    *pbase = bf->ascent;
+}
+
+static void corefont_drawtext(Bitmap_Font* bf, ttk_surface srf, int x, int y,
+                              const void* text, int cc, ttk_color col) {
+    const unsigned char* str = text;
+    int width, height, base, startx, starty;
+    const unsigned short* bitmap;
+
+    startx = x;
+    starty = y;
+
+    while (--cc >= 0 && x < srf->w) {
+        int ch = *str++;
+        gen_gettextbits(bf, ch, &bitmap, &width, &height, &base);
+        draw_bitmap(srf, x, y, width, height, bitmap, col);
+        x += width;
+    }
+}
+
+static void corefont16_drawtext(Bitmap_Font* bf, ttk_surface srf, int x, int y,
+                                const unsigned short* str, int cc,
+                                ttk_color col) {
+    int width, height, base, startx, starty;
+    const unsigned short* bitmap;
+
+    startx = x;
+    starty = y;
+
+    while (--cc >= 0 && x < srf->w) {
+        int ch = *str++;
+        gen_gettextbits(bf, ch, &bitmap, &width, &height, &base);
+        draw_bitmap(srf, x, y, width, height, bitmap, col);
+        x += width;
+    }
+}
+
+static int IsASCII(const char* str) {
+    const char* p = str;
+    while (*p) {
+        if (*p & 0x80) return 0;
+        p++;
+    }
+    return 1;
+}
+
+static int ConvertUTF8(const unsigned char* src, unsigned short* dst) {
+    const unsigned char* sp = src;
+    unsigned short* dp = dst;
+    int len = 0;
+    while (*sp) {
+        *dp = 0;
+        if (*sp < 0x80)
+            *dp = *sp++;
+        else if (*sp >= 0xC0 && *sp < 0xE0) {
+            *dp |= (*sp++ - 0xC0) << 6;
+            if (!*sp) goto err;
+            *dp |= (*sp++ - 0x80);
+        } else if (*sp >= 0xE0 && *sp < 0xF0) {
+            *dp |= (*sp++ - 0xE0) << 12;
+            if (!*sp) goto err;
+            *dp |= (*sp++ - 0x80) << 6;
+            if (!*sp) goto err;
+            *dp |= (*sp++ - 0x80);
+        } else
+            goto err;
+
+        dp++;
+        len++;
+        continue;
+
+    err:
+        *dp++ = '?';
+        sp++;
+        len++;
+    }
+    *dp = 0;
+    return len;
+}
+
+static void draw_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
+                    const char* str) {
+    const void* text = (const void*)str;
+    int cc = strlen(str);
+    if (!f->bf) return;
+
+    if (IsASCII(str))
+        corefont_drawtext(f->bf, srf, x, y, text, cc, col);
+    else {
+        unsigned short* buf = malloc(strlen(str) * 2);
+        int len = ConvertUTF8((unsigned char*)str, buf);
+        corefont16_drawtext(f->bf, srf, x, y, buf, len, col);
+        free(buf);
+    }
+}
+
+static void lat1_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
+                    const char* str) {
+    const void* text = (const void*)str;
+    int cc = strlen(str);
+    if (!f->bf) return;
+
+    corefont_drawtext(f->bf, srf, x, y, text, strlen(str), col);
+}
+
+static void uc16_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
+                    const uc16* str) {
+    int cc = 0;
+    const uc16* p = str;
+    if (!f->bf) return;
+
+    while (*p++) cc++;
+    corefont16_drawtext(f->bf, srf, x, y, str, cc, col);
+}
+
+static int width_bf(ttk_font f, const char* str) {
+    int width, height, base;
+    if (!f->bf) return -1;
+
+    if (IsASCII(str))
+        gen_gettextsize(f->bf, str, strlen(str), &width, &height, &base);
+    else {
+        unsigned short* buf = malloc(strlen(str) * 2);
+        int len = ConvertUTF8((unsigned char*)str, buf);
+        gen16_gettextsize(f->bf, buf, len, &width, &height, &base);
+        free(buf);
+    }
+    return width;
+}
+static int widthL_bf(ttk_font f, const char* str) {
+    int width, height, base;
+    if (!f->bf) return -1;
+    gen_gettextsize(f->bf, str, strlen(str), &width, &height, &base);
+    return width;
+}
+static int widthU_bf(ttk_font f, const uc16* str) {
+    int width, height, base;
+    int cc = 0;
+    const uc16* p = str;
+    if (!f->bf) return -1;
+
+    while (*p++) cc++;
+    gen16_gettextsize(f->bf, str, cc, &width, &height, &base);
+    return width;
+}
+
+static void free_bf(ttk_font f) {
+    if (f->bf->name) free(f->bf->name);
+    if (f->bf->bits) free((char*)f->bf->bits);
+    if (f->bf->offset) free((char*)f->bf->offset);
+    if (f->bf->width) free((char*)f->bf->width);
+    f->bf = 0;
+}
+
+#ifndef NO_SF
+static void draw_sf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
+                    const char* str) {
+    Uint8 r, g, b;
+    SDL_GetRGB(col, srf->format, &r, &g, &b);
+
+    if (!f->sf) return;
+
+    if ((r + g + b) > 600)
+        SFont_Write(srf, f->sfi, x, y, str);
+    else
+        SFont_Write(srf, f->sf, x, y, str);
+}
+static void draw16_sf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
+                      const uc16* str) {
+    int len = 0;
+    const uc16* sp = str;
+    char *dst, *dp;
+    while (*sp++) len++;
+    dp = dst = malloc(len);
+    sp = str;
+    while (*sp) *dp++ = (*sp++ & 0xff);
+    *dp = 0;
+    draw_sf(f, srf, x, y, col, dst);
+    free(dst);
+}
+static int width_sf(ttk_font f, const char* str) {
+    if (f->sf) return SFont_TextWidth(f->sf, str);
+    return 0;
+}
+static int width16_sf(ttk_font f, const uc16* str) {
+    int len = 0;
+    const uc16* sp = str;
+    char *dst, *dp;
+    int ret;
+
+    while (*sp++) len++;
+    dp = dst = malloc(len);
+    sp = str;
+    while (*sp) *dp++ = (*sp++ & 0xff);
+    *dp = 0;
+
+    ret = width_sf(f, dst);
+    free(dst);
+    return ret;
+}
+static void free_sf(ttk_font f) {
+    SFont_FreeFont(f->sf);
+    SFont_FreeFont(f->sfi);
+    f->sf = 0;
+}
+#endif
+
+#ifndef NO_TF
+#define TF_FUNC(name, type, func)                                    \
+    static void name##_tf(ttk_font f, ttk_surface srf, int x, int y, \
+                          ttk_color col, const type* str) {          \
+        SDL_Surface* textsrf;                                        \
+        SDL_Rect dr;                                                 \
+                                                                     \
+        textsrf = TTF_Render##func##_Blended(f->tf, str, col);       \
+                                                                     \
+        dr.x = x;                                                    \
+        dr.y = y;                                                    \
+        SDL_BlitSurface(textsrf, 0, srf, &dr);                       \
+    }
+TF_FUNC(draw, char, UTF8);
+TF_FUNC(lat1, char, Text);
+TF_FUNC(uc16, Uint16, UNICODE);
+
+static int width_tf(ttk_font f, const char* str) {
+    int w, h;
+    TTF_SizeUTF8(f->tf, str, &w, &h);
+    return w;
+}
+static int widthL_tf(ttk_font f, const char* str) {
+    int w, h;
+    TTF_SizeText(f->tf, str, &w, &h);
+    return w;
+}
+static int widthU_tf(ttk_font f, const uc16* str) {
+    int w, h;
+    TTF_SizeUNICODE(f->tf, str, &w, &h);
+    return w;
+}
+static void free_tf(ttk_font f) { TTF_CloseFont(f->tf); }
+#endif
+
 void ttk_load_font(ttk_fontinfo* fi, const char* fnbase, int size) {
-    // Minimal implementation: fail or use SDL_ttf if available
-    // In a real scenario, copy the font loading logic from sdl.c
-    fprintf(stderr, "ttk_load_font not fully implemented in waveshare.c\n");
+    char* fname = alloca(strlen(fnbase) + 7); /* +7: - i . p n g \0 */
+    struct stat st;
+
+    fi->f = calloc(1, sizeof(struct _ttk_font));
+
+#ifndef NO_SF
+    strcpy(fname, fnbase);
+    strcat(fname, ".png");
+    if (stat(fname, &st) >= 0) {
+        fi->f->sf = SFont_InitFont(IMG_Load(fname));
+        strcpy(fname, fnbase);
+        strcat(fname, "-i.png");
+        fi->f->sfi = SFont_InitFont(IMG_Load(fname));
+        fi->f->draw = fi->f->draw_lat1 = draw_sf;
+        fi->f->draw_uc16 = draw16_sf;
+        fi->f->width = fi->f->width_lat1 = width_sf;
+        fi->f->width_uc16 = width16_sf;
+        fi->f->free = free_sf;
+        fi->f->height = SFont_TextHeight(fi->f->sf);
+        return;
+    }
+#endif
+
+#ifndef NO_TF
+    strcpy(fname, fnbase);
+    strcat(fname, ".ttf");
+    if (stat(fname, &st) >= 0) {
+        fi->f->tf = TTF_OpenFont(fname, size);
+        fi->f->draw = draw_tf;
+        fi->f->draw_lat1 = lat1_tf;
+        fi->f->draw_uc16 = uc16_tf;
+        fi->f->width = width_tf;
+        fi->f->width_lat1 = widthL_tf;
+        fi->f->width_uc16 = widthU_tf;
+        fi->f->free = free_tf;
+        fi->f->height = TTF_FontHeight(fi->f->tf);
+        return;
+    }
+#endif
+
+    strcpy(fname, fnbase);
+    strcat(fname, ".fnt");
+    if (stat(fname, &st) >= 0) {
+        fi->f->bf = calloc(1, sizeof(Bitmap_Font));
+        load_fnt(fi->f->bf, fname);
+        fi->f->draw = draw_bf;
+        fi->f->draw_lat1 = lat1_bf;
+        fi->f->draw_uc16 = uc16_bf;
+        fi->f->width = width_bf;
+        fi->f->width_lat1 = widthL_bf;
+        fi->f->width_uc16 = widthU_bf;
+        fi->f->free = free_bf;
+        fi->f->height = fi->f->bf->height;
+        return;
+    }
+
+    free(fi->f);
     fi->good = 0;
+    return;
 }
 void ttk_unload_font(ttk_fontinfo* fi) {
-    if (fi->f) free(fi->f);
+    fi->f->free(fi->f);
     fi->loaded = 0;
+    fi->good = 0;
 }
 
 void ttk_text(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
               const char* str) {
-    // Stub: implement using font->draw
+    fnt->draw(fnt, srf, x, y + fnt->ofs, col, str);
 }
-void ttk_text_gc(ttk_surface srf, ttk_gc gc, int x, int y, const char* str) {
-    // Stub
+void ttk_text_lat1(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+                   const char* str) {
+    fnt->draw_lat1(fnt, srf, x, y + fnt->ofs, col, str);
 }
-int ttk_text_width(ttk_font fnt, const char* str) { return 0; }
-int ttk_text_height(ttk_font fnt) { return 0; }
-int ttk_text_width_gc(ttk_gc gc, const char* str) { return 0; }
-int ttk_text_height_gc(ttk_gc gc) { return 0; }
+void ttk_text_uc16(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+                   const uc16* str) {
+    fnt->draw_uc16(fnt, srf, x, y + fnt->ofs, col, str);
+}
+int ttk_text_width(ttk_font fnt, const char* str) {
+    if (!str) return 0;
+    return fnt->width(fnt, str);
+}
+int ttk_text_width_lat1(ttk_font fnt, const char* str) {
+    if (!str) return 0;
+    return fnt->width_lat1(fnt, str);
+}
+int ttk_text_width_uc16(ttk_font fnt, const uc16* str) {
+    if (!str) return 0;
+    return fnt->width_uc16(fnt, str);
+}
+int ttk_text_width_gc(ttk_gc gc, const char* str) {
+    return gc->font->width(gc->font, str);
+}
+int ttk_text_height(ttk_font fnt) { return fnt->height; }
+int ttk_text_height_gc(ttk_gc gc) { return gc->font->height; }
+void ttk_textf(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+               const char* fmt, ...) {
+    static char* buffer;
+    va_list ap;
 
-ttk_surface ttk_load_image(const char* path) { return SDL_LoadBMP(path); }
+    if (!buffer) buffer = malloc(4096);
+
+    va_start(ap, fmt);
+    vsnprintf(buffer, 4096, fmt, ap);
+    va_end(ap);
+    fnt->draw(fnt, srf, x, y + fnt->ofs, col, buffer);
+}
+
+void ttk_text_gc(ttk_surface srf, ttk_gc gc, int x, int y, const char* str) {
+    if (gc->usebg) {
+        ttk_fillrect(srf, x, y, x + ttk_text_width_gc(gc, str),
+                     y + ttk_text_height_gc(gc), gc->bg);
+    }
+    gc->font->draw(gc->font, srf, x, y, gc->fg, str);
+}
+
+ttk_surface ttk_load_image(const char* path) { return IMG_Load(path); }
 void ttk_free_image(ttk_surface img) { SDL_FreeSurface(img); }
 void ttk_blit_image(ttk_surface src, ttk_surface dst, int dx, int dy) {
     SDL_Rect dr = {dx, dy, 0, 0};
