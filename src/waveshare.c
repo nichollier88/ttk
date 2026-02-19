@@ -5,41 +5,42 @@
  * Replaces sdl.c for this specific hardware.
  */
 
+#include <SDL.h>
 #include <lgpio.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 #include <sys/stat.h>
-#include <SDL.h>
 
 #include "ttk.h"
 #include "ttk/SDL_gfxPrimitives.h"
+#include "ttk/SDL_rotozoom.h"
 
 // Waveshare 1.44inch LCD HAT GPIOs (BCM)
-#define LCD_CS      8
-#define LCD_RST     27
-#define LCD_DC      25
-#define LCD_BL      24
+#define LCD_CS 8
+#define LCD_RST 27
+#define LCD_DC 25
+#define LCD_BL 24
 
-#define KEY_UP      6
-#define KEY_DOWN    19
-#define KEY_LEFT    5
-#define KEY_RIGHT   26
-#define KEY_PRESS   13
-#define KEY1        21
-#define KEY2        20
-#define KEY3        16
+#define KEY_UP 6
+#define KEY_DOWN 19
+#define KEY_LEFT 5
+#define KEY_RIGHT 26
+#define KEY_PRESS 13
+#define KEY1 21
+#define KEY2 20
+#define KEY3 16
 
 // ST7735S commands
 #define ST7735_SWRESET 0x01
-#define ST7735_SLPOUT  0x11
-#define ST7735_DISPON  0x29
-#define ST7735_CASET   0x2A
-#define ST7735_RASET   0x2B
-#define ST7735_RAMWR   0x2C
-#define ST7735_MADCTL  0x36
-#define ST7735_COLMOD  0x3A
+#define ST7735_SLPOUT 0x11
+#define ST7735_DISPON 0x29
+#define ST7735_CASET 0x2A
+#define ST7735_RASET 0x2B
+#define ST7735_RAMWR 0x2C
+#define ST7735_MADCTL 0x36
+#define ST7735_COLMOD 0x3A
 
 extern ttk_screeninfo* ttk_screen;
 
@@ -74,17 +75,17 @@ static void LCD_Init_Reg(void) {
     LCD_Write_Command(ST7735_SLPOUT);
     lguSleep(0.120);
 
-    LCD_Write_Command(0xB1); // Frame Rate Control 1
+    LCD_Write_Command(0xB1);  // Frame Rate Control 1
     LCD_Write_Data(0x01);
     LCD_Write_Data(0x2C);
     LCD_Write_Data(0x2D);
 
-    LCD_Write_Command(0xB2); // Frame Rate Control 2
+    LCD_Write_Command(0xB2);  // Frame Rate Control 2
     LCD_Write_Data(0x01);
     LCD_Write_Data(0x2C);
     LCD_Write_Data(0x2D);
 
-    LCD_Write_Command(0xB3); // Frame Rate Control 3
+    LCD_Write_Command(0xB3);  // Frame Rate Control 3
     LCD_Write_Data(0x01);
     LCD_Write_Data(0x2C);
     LCD_Write_Data(0x2D);
@@ -92,41 +93,41 @@ static void LCD_Init_Reg(void) {
     LCD_Write_Data(0x2C);
     LCD_Write_Data(0x2D);
 
-    LCD_Write_Command(0xB4); // Display Inversion Control
+    LCD_Write_Command(0xB4);  // Display Inversion Control
     LCD_Write_Data(0x07);
 
-    LCD_Write_Command(0xC0); // Power Control 1
+    LCD_Write_Command(0xC0);  // Power Control 1
     LCD_Write_Data(0xA2);
     LCD_Write_Data(0x02);
     LCD_Write_Data(0x84);
 
-    LCD_Write_Command(0xC1); // Power Control 2
+    LCD_Write_Command(0xC1);  // Power Control 2
     LCD_Write_Data(0xC5);
 
-    LCD_Write_Command(0xC2); // Power Control 3
+    LCD_Write_Command(0xC2);  // Power Control 3
     LCD_Write_Data(0x0A);
     LCD_Write_Data(0x00);
 
-    LCD_Write_Command(0xC3); // Power Control 4
+    LCD_Write_Command(0xC3);  // Power Control 4
     LCD_Write_Data(0x8A);
     LCD_Write_Data(0x2A);
 
-    LCD_Write_Command(0xC4); // Power Control 5
+    LCD_Write_Command(0xC4);  // Power Control 5
     LCD_Write_Data(0x8A);
     LCD_Write_Data(0xEE);
 
-    LCD_Write_Command(0xC5); // VCOM Control 1
+    LCD_Write_Command(0xC5);  // VCOM Control 1
     LCD_Write_Data(0x0E);
 
-    LCD_Write_Command(0x20); // Display Inversion Off
+    LCD_Write_Command(0x20);  // Display Inversion Off
 
-    LCD_Write_Command(ST7735_MADCTL); // Memory Data Access Control
-    LCD_Write_Data(0xC8); // BGR, MX, MY
+    LCD_Write_Command(ST7735_MADCTL);  // Memory Data Access Control
+    LCD_Write_Data(0xC8);              // BGR, MX, MY
 
-    LCD_Write_Command(ST7735_COLMOD); // Interface Pixel Format
-    LCD_Write_Data(0x05); // 16-bit/pixel
+    LCD_Write_Command(ST7735_COLMOD);  // Interface Pixel Format
+    LCD_Write_Data(0x05);              // 16-bit/pixel
 
-    LCD_Write_Command(ST7735_DISPON); // Display On
+    LCD_Write_Command(ST7735_DISPON);  // Display On
     lguSleep(0.100);
 }
 
@@ -154,15 +155,17 @@ static void LCD_SetWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
 
 void ttk_gfx_init() {
     char buffer[128];
-    FILE *fp;
+    FILE* fp;
 
     fp = popen("cat /proc/cpuinfo | grep 'Raspberry Pi 5'", "r");
     if (fp == NULL) {
-        fprintf(stderr, "It is not possible to determine the model of the Raspberry PI\n");
+        fprintf(
+            stderr,
+            "It is not possible to determine the model of the Raspberry PI\n");
         exit(1);
     }
 
-    if(fgets(buffer, sizeof(buffer), fp) != NULL) {
+    if (fgets(buffer, sizeof(buffer), fp) != NULL) {
         GPIO_Handle = lgGpiochipOpen(4);
         if (GPIO_Handle < 0) {
             fprintf(stderr, "gpiochip4 Export Failed\n");
@@ -189,7 +192,8 @@ void ttk_gfx_init() {
     lgGpioClaimOutput(GPIO_Handle, 0, LCD_DC, 0);
     lgGpioClaimOutput(GPIO_Handle, 0, LCD_BL, 0);
 
-    int inputs[] = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_PRESS, KEY1, KEY2, KEY3};
+    int inputs[] = {KEY_UP,    KEY_DOWN, KEY_LEFT, KEY_RIGHT,
+                    KEY_PRESS, KEY1,     KEY2,     KEY3};
     for (int i = 0; i < 8; i++) {
         lgGpioClaimInput(GPIO_Handle, 0, inputs[i]);
     }
@@ -212,17 +216,18 @@ void ttk_gfx_init() {
     }
 
     // Create a software surface for TTK to draw on (128x128, 16bpp RGB565)
-    ttk_screen->srf = SDL_CreateRGBSurface(SDL_SWSURFACE, 128, 128, 16, 0xF800, 0x07E0, 0x001F, 0);
+    ttk_screen->srf = SDL_CreateRGBSurface(SDL_SWSURFACE, 128, 128, 16, 0xF800,
+                                           0x07E0, 0x001F, 0);
     if (!ttk_screen->srf) {
         fprintf(stderr, "SDL_CreateRGBSurface failed: %s\n", SDL_GetError());
         exit(1);
     }
-    
+
     // Force TTK screen info to match HAT
     ttk_screen->w = 128;
     ttk_screen->h = 128;
     ttk_screen->bpp = 16;
-    
+
     SDL_EnableUNICODE(1);
 }
 
@@ -239,31 +244,29 @@ void ttk_gfx_update(ttk_surface srf) {
 
     LCD_SetWindow(0, 0, 127, 127);
     lgGpioWrite(GPIO_Handle, LCD_DC, 1);
-    
-    uint16_t *pixels = (uint16_t*)srf->pixels;
+
+    uint16_t* pixels = (uint16_t*)srf->pixels;
     int count = 128 * 128;
-    
+
     // Buffer for SPI transfer (swap bytes for big-endian display)
     static uint8_t buffer[128 * 128 * 2];
     for (int i = 0; i < count; i++) {
         uint16_t p = pixels[i];
-        buffer[i*2] = (p >> 8) & 0xFF;
-        buffer[i*2+1] = p & 0xFF;
+        buffer[i * 2] = (p >> 8) & 0xFF;
+        buffer[i * 2 + 1] = p & 0xFF;
     }
-    
+
     lgSpiWrite(SPI_Handle, (char*)buffer, count * 2);
 
     if (SDL_MUSTLOCK(srf)) SDL_UnlockSurface(srf);
 }
 
-int ttk_get_rawevent(int* arg) {
-    return TTK_NO_EVENT;
-}
+int ttk_get_rawevent(int* arg) { return TTK_NO_EVENT; }
 
 int ttk_get_event(int* arg) {
     static uint32_t last_time = 0;
     uint32_t current_time = SDL_GetTicks();
-    
+
     // Simple debounce/rate limit
     if (current_time - last_time < 20) return TTK_NO_EVENT;
     last_time = current_time;
@@ -272,14 +275,22 @@ int ttk_get_event(int* arg) {
 
     // State tracking for button up/down events
     static int button_states[128] = {0};
-    int buttons[] = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_PRESS, KEY1, KEY2, KEY3};
-    int ttk_btns[] = {TTK_BUTTON_MENU, TTK_BUTTON_PLAY, TTK_BUTTON_PREVIOUS, TTK_BUTTON_NEXT, TTK_BUTTON_ACTION, '1', '2', '3'};
-    
+    int buttons[] = {KEY_UP,    KEY_DOWN, KEY_LEFT, KEY_RIGHT,
+                     KEY_PRESS, KEY1,     KEY2,     KEY3};
+    int ttk_btns[] = {TTK_BUTTON_MENU,
+                      TTK_BUTTON_PLAY,
+                      TTK_BUTTON_PREVIOUS,
+                      TTK_BUTTON_NEXT,
+                      TTK_BUTTON_ACTION,
+                      '1',
+                      '2',
+                      '3'};
+
     for (int i = 0; i < 8; i++) {
         int pin = buttons[i];
-        int val = lgGpioRead(GPIO_Handle, pin); // Active LOW
+        int val = lgGpioRead(GPIO_Handle, pin);  // Active LOW
         int ttk_btn = ttk_btns[i];
-        
+
         if (val == 0 && button_states[ttk_btn] == 0) {
             button_states[ttk_btn] = 1;
             *arg = ttk_btn;
@@ -321,7 +332,9 @@ void ttk_unmakecol_ex(ttk_color col, int* r, int* g, int* b, ttk_surface srf) {
     if (!srf) srf = ttk_screen->srf;
     Uint8 R, G, B;
     SDL_GetRGB(col, srf->format, &R, &G, &B);
-    *r = R; *g = G; *b = B;
+    *r = R;
+    *g = G;
+    *b = B;
 }
 
 ttk_gc ttk_new_gc() { return (ttk_gc)calloc(1, sizeof(struct _ttk_gc)); }
@@ -368,7 +381,8 @@ void ttk_line_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
     lineColor(srf, x1, y1, x2, y2, fetchcolor(gc->fg));
 }
 
-void ttk_aaline(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
+void ttk_aaline(ttk_surface srf, int x1, int y1, int x2, int y2,
+                ttk_color col) {
     aalineColor(srf, x1, y1, x2, y2, fetchcolor(col));
 }
 void ttk_aaline_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
@@ -382,7 +396,8 @@ void ttk_rect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
     rectangleColor(srf, x, y, x + w, y + h, fetchcolor(gc->fg));
 }
 
-void ttk_fillrect(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
+void ttk_fillrect(ttk_surface srf, int x1, int y1, int x2, int y2,
+                  ttk_color col) {
     boxColor(srf, x1, y1, x2, y2, fetchcolor(col));
 }
 void ttk_fillrect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
@@ -441,8 +456,251 @@ void ttk_vgradient(ttk_surface srf, int x1, int y1, int x2, int y2,
     ttk_do_gradient(srf, 0, 0, 0, x1, y1, x2, y2, top, bottom);
 }
 
-// Font loading stubs (simplified for brevity, assumes SDL_ttf or SFont available)
-// For full functionality, copy load_fnt/pcf/fff from sdl.c
+void ttk_poly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
+    polygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
+}
+void ttk_poly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
+    int i;
+    short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
+    if (!vx || !vy) {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
+
+    for (i = 0; i < n; i++) {
+        vx[i] = v[i].x;
+        vy[i] = v[i].y;
+    }
+
+    polygonColor(srf, vx, vy, n, fetchcolor(col));
+
+    free(vx);
+    free(vy);
+}
+void ttk_poly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
+    ttk_poly_pt(srf, v, n, gc->fg);
+}
+
+void ttk_aapoly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
+    aapolygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
+}
+void ttk_aapoly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
+    int i;
+    short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
+    if (!vx || !vy) {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
+
+    for (i = 0; i < n; i++) {
+        vx[i] = v[i].x;
+        vy[i] = v[i].y;
+    }
+
+    aapolygonColor(srf, vx, vy, n, fetchcolor(col));
+
+    free(vx);
+    free(vy);
+}
+void ttk_aapoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
+    ttk_aapoly_pt(srf, v, n, gc->fg);
+}
+
+void ttk_polyline(ttk_surface srf, int nv, short* vx, short* vy,
+                  ttk_color col) {
+    polylineColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
+}
+void ttk_polyline_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
+    int i;
+    short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
+    if (!vx || !vy) {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
+
+    for (i = 0; i < n; i++) {
+        vx[i] = v[i].x;
+        vy[i] = v[i].y;
+    }
+
+    polylineColor(srf, vx, vy, n, fetchcolor(col));
+
+    free(vx);
+    free(vy);
+}
+void ttk_polyline_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
+    ttk_polyline_pt(srf, v, n, gc->fg);
+}
+
+#define DO_BEZIER(function)                                                   \
+    /*  Note: I don't think there is any great performance win in             \
+     *  translating this to fixed-point integer math, most of the time        \
+     *  is spent in the line drawing routine. */                              \
+    float x = (float)x1, y = (float)y1;                                       \
+    float xp = x, yp = y;                                                     \
+    float delta;                                                              \
+    float dx, d2x, d3x;                                                       \
+    float dy, d2y, d3y;                                                       \
+    float a, b, c;                                                            \
+    int i;                                                                    \
+    int n = 1;                                                                \
+    Sint16 xmax = x1, ymax = y1, xmin = x1, ymin = y1;                        \
+                                                                              \
+    /* compute number of iterations */                                        \
+    if (level < 1) level = 1;                                                 \
+    if (level >= 15) level = 15;                                              \
+    while (level-- > 0) n *= 2;                                               \
+    delta = (float)(1.0 / (float)n);                                          \
+                                                                              \
+    /* compute finite differences                                             \
+     * a, b, c are the coefficient of the polynom in t defining the           \
+     * parametric curve. The computation is done independently for x and y */ \
+    a = (float)(-x1 + 3 * x2 - 3 * x3 + x4);                                  \
+    b = (float)(3 * x1 - 6 * x2 + 3 * x3);                                    \
+    c = (float)(-3 * x1 + 3 * x2);                                            \
+                                                                              \
+    d3x = 6 * a * delta * delta * delta;                                      \
+    d2x = d3x + 2 * b * delta * delta;                                        \
+    dx = a * delta * delta * delta + b * delta * delta + c * delta;           \
+                                                                              \
+    a = (float)(-y1 + 3 * y2 - 3 * y3 + y4);                                  \
+    b = (float)(3 * y1 - 6 * y2 + 3 * y3);                                    \
+    c = (float)(-3 * y1 + 3 * y2);                                            \
+                                                                              \
+    d3y = 6 * a * delta * delta * delta;                                      \
+    d2y = d3y + 2 * b * delta * delta;                                        \
+    dy = a * delta * delta * delta + b * delta * delta + c * delta;           \
+                                                                              \
+    /* iterate */                                                             \
+    for (i = 0; i < n; i++) {                                                 \
+        x += dx;                                                              \
+        dx += d2x;                                                            \
+        d2x += d3x;                                                           \
+        y += dy;                                                              \
+        dy += d2y;                                                            \
+        d2y += d3y;                                                           \
+        if ((Sint16)xp != (Sint16)x || (Sint16)yp != (Sint16)y) {             \
+            function;                                                         \
+            xmax = (xmax > (Sint16)xp) ? xmax : (Sint16)xp;                   \
+            ymax = (ymax > (Sint16)yp) ? ymax : (Sint16)yp;                   \
+            xmin = (xmin < (Sint16)xp) ? xmin : (Sint16)xp;                   \
+            ymin = (ymin < (Sint16)yp) ? ymin : (Sint16)yp;                   \
+            xmax = (xmax > (Sint16)x) ? xmax : (Sint16)x;                     \
+            ymax = (ymax > (Sint16)y) ? ymax : (Sint16)y;                     \
+            xmin = (xmin < (Sint16)x) ? xmin : (Sint16)x;                     \
+            ymin = (ymin < (Sint16)y) ? ymin : (Sint16)y;                     \
+        }                                                                     \
+        xp = x;                                                               \
+        yp = y;                                                               \
+    }
+
+void ttk_bezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3, int y3,
+                int x4, int y4, int level, ttk_color col) {
+    DO_BEZIER(ttk_line(srf, (short)xp, (short)yp, (short)x, (short)y, col));
+}
+void ttk_bezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
+                   int x3, int y3, int x4, int y4, int level) {
+    ttk_bezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
+}
+
+void ttk_aabezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3,
+                  int y3, int x4, int y4, int level, ttk_color col) {
+    DO_BEZIER(ttk_aaline(srf, (short)xp, (short)yp, (short)x, (short)y, col));
+}
+void ttk_aabezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
+                     int x3, int y3, int x4, int y4, int level) {
+    ttk_aabezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
+}
+
+void ttk_fillpoly(ttk_surface srf, int nv, short* vx, short* vy,
+                  ttk_color col) {
+    filledPolygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
+}
+void ttk_fillpoly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
+    int i;
+    short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
+    if (!vx || !vy) {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
+
+    for (i = 0; i < n; i++) {
+        vx[i] = v[i].x;
+        vy[i] = v[i].y;
+    }
+
+    filledPolygonColor(srf, vx, vy, n, fetchcolor(col));
+
+    free(vx);
+    free(vy);
+}
+void ttk_fillpoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
+    ttk_fillpoly_pt(srf, v, n, gc->fg);
+}
+
+void ttk_ellipse(ttk_surface srf, int x, int y, int rx, int ry, ttk_color col) {
+    if (rx == ry) {
+        circleColor(srf, x, y, rx, fetchcolor(col));
+    } else {
+        ellipseColor(srf, x, y, rx, ry, fetchcolor(col));
+    }
+}
+void ttk_ellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx, int ry) {
+    if (rx == ry) {
+        circleColor(srf, x, y, rx, fetchcolor(gc->fg));
+    } else {
+        ellipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
+    }
+}
+
+void ttk_aaellipse(ttk_surface srf, int x, int y, int rx, int ry,
+                   ttk_color col) {
+    if (rx == ry) {
+        aacircleColor(srf, x, y, rx, fetchcolor(col));
+    } else {
+        aaellipseColor(srf, x, y, rx, ry, fetchcolor(col));
+    }
+}
+void ttk_aaellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
+                      int ry) {
+    if (rx == ry) {
+        aacircleColor(srf, x, y, rx, fetchcolor(gc->fg));
+    } else {
+        aaellipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
+    }
+}
+
+void ttk_fillellipse(ttk_surface srf, int x, int y, int rx, int ry,
+                     ttk_color col) {
+    if (rx == ry) {
+        filledCircleColor(srf, x, y, rx, fetchcolor(col));
+    } else {
+        filledEllipseColor(srf, x, y, rx, ry, fetchcolor(col));
+    }
+}
+void ttk_fillellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
+                        int ry) {
+    if (rx == ry) {
+        filledCircleColor(srf, x, y, rx, fetchcolor(gc->fg));
+    } else {
+        filledEllipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
+    }
+}
+
+void ttk_aafillellipse(ttk_surface srf, int xc, int yc, int rx, int ry,
+                       ttk_color col) {
+    // Stub or simple implementation for now to satisfy linker if needed
+    // Using filled ellipse as fallback
+    ttk_fillellipse(srf, xc, yc, rx, ry, col);
+}
+
+void ttk_aafillellipse_gc(ttk_surface srf, ttk_gc gc, int xc, int yc, int rx,
+                          int ry) {
+    ttk_aafillellipse(srf, xc, yc, rx, ry, gc->fg);
+}
+
+// Font loading stubs (simplified for brevity, assumes SDL_ttf or SFont
+// available) For full functionality, copy load_fnt/pcf/fff from sdl.c
 void ttk_load_font(ttk_fontinfo* fi, const char* fnbase, int size) {
     // Minimal implementation: fail or use SDL_ttf if available
     // In a real scenario, copy the font loading logic from sdl.c
@@ -454,7 +712,8 @@ void ttk_unload_font(ttk_fontinfo* fi) {
     fi->loaded = 0;
 }
 
-void ttk_text(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col, const char* str) {
+void ttk_text(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+              const char* str) {
     // Stub: implement using font->draw
 }
 void ttk_text_gc(ttk_surface srf, ttk_gc gc, int x, int y, const char* str) {
@@ -471,21 +730,269 @@ void ttk_blit_image(ttk_surface src, ttk_surface dst, int dx, int dy) {
     SDL_Rect dr = {dx, dy, 0, 0};
     SDL_BlitSurface(src, 0, dst, &dr);
 }
-void ttk_blit_image_ex(ttk_surface src, int sx, int sy, int sw, int sh, ttk_surface dst, int dx, int dy) {
+void ttk_blit_image_ex(ttk_surface src, int sx, int sy, int sw, int sh,
+                       ttk_surface dst, int dx, int dy) {
     SDL_Rect sr = {sx, sy, sw, sh};
     SDL_Rect dr = {dx, dy, 0, 0};
     SDL_BlitSurface(src, &sr, dst, &dr);
 }
 
 ttk_surface ttk_new_surface(int w, int h, int bpp) {
-    return SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 16, 0xF800, 0x07E0, 0x001F, 0);
+    return SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 16, 0xF800, 0x07E0, 0x001F,
+                                0);
 }
 void ttk_free_surface(ttk_surface srf) { SDL_FreeSurface(srf); }
 void ttk_surface_get_dimen(ttk_surface srf, int* w, int* h) {
     if (w) *w = srf->w;
     if (h) *h = srf->h;
 }
+
+ttk_surface ttk_scale_surface(ttk_surface srf, float factor) {
+    return zoomSurface(srf, factor, factor, 1);
+}
+void ttk_polyline(ttk_surface srf, int nv, short* vx, short* vy,
+                  ttk_color col) {
+    polylineColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
+}
+void ttk_polyline_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
+    int i;
+    short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
+    if (!vx || !vy) {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
+
+    for (i = 0; i < n; i++) {
+        vx[i] = v[i].x;
+        vy[i] = v[i].y;
+    }
+
+    polylineColor(srf, vx, vy, n, fetchcolor(col));
+
+    free(vx);
+    free(vy);
+}
+void ttk_polyline_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
+    ttk_polyline_pt(srf, v, n, gc->fg);
+}
+
+#define DO_BEZIER(function)                                                   \
+    /*  Note: I don't think there is any great performance win in             \
+     *  translating this to fixed-point integer math, most of the time        \
+     *  is spent in the line drawing routine. */                              \
+    float x = (float)x1, y = (float)y1;                                       \
+    float xp = x, yp = y;                                                     \
+    float delta;                                                              \
+    float dx, d2x, d3x;                                                       \
+    float dy, d2y, d3y;                                                       \
+    float a, b, c;                                                            \
+    int i;                                                                    \
+    int n = 1;                                                                \
+    Sint16 xmax = x1, ymax = y1, xmin = x1, ymin = y1;                        \
+                                                                              \
+    /* compute number of iterations */                                        \
+    if (level < 1) level = 1;                                                 \
+    if (level >= 15) level = 15;                                              \
+    while (level-- > 0) n *= 2;                                               \
+    delta = (float)(1.0 / (float)n);                                          \
+                                                                              \
+    /* compute finite differences                                             \
+     * a, b, c are the coefficient of the polynom in t defining the           \
+     * parametric curve. The computation is done independently for x and y */ \
+    a = (float)(-x1 + 3 * x2 - 3 * x3 + x4);                                  \
+    b = (float)(3 * x1 - 6 * x2 + 3 * x3);                                    \
+    c = (float)(-3 * x1 + 3 * x2);                                            \
+                                                                              \
+    d3x = 6 * a * delta * delta * delta;                                      \
+    d2x = d3x + 2 * b * delta * delta;                                        \
+    dx = a * delta * delta * delta + b * delta * delta + c * delta;           \
+                                                                              \
+    a = (float)(-y1 + 3 * y2 - 3 * y3 + y4);                                  \
+    b = (float)(3 * y1 - 6 * y2 + 3 * y3);                                    \
+    c = (float)(-3 * y1 + 3 * y2);                                            \
+                                                                              \
+    d3y = 6 * a * delta * delta * delta;                                      \
+    d2y = d3y + 2 * b * delta * delta;                                        \
+    dy = a * delta * delta * delta + b * delta * delta + c * delta;           \
+                                                                              \
+    /* iterate */                                                             \
+    for (i = 0; i < n; i++) {                                                 \
+        x += dx;                                                              \
+        dx += d2x;                                                            \
+        d2x += d3x;                                                           \
+        y += dy;                                                              \
+        dy += d2y;                                                            \
+        d2y += d3y;                                                           \
+        if ((Sint16)xp != (Sint16)x || (Sint16)yp != (Sint16)y) {             \
+            function;                                                         \
+            xmax = (xmax > (Sint16)xp) ? xmax : (Sint16)xp;                   \
+            ymax = (ymax > (Sint16)yp) ? ymax : (Sint16)yp;                   \
+            xmin = (xmin < (Sint16)xp) ? xmin : (Sint16)xp;                   \
+            ymin = (ymin < (Sint16)yp) ? ymin : (Sint16)yp;                   \
+            xmax = (xmax > (Sint16)x) ? xmax : (Sint16)x;                     \
+            ymax = (ymax > (Sint16)y) ? ymax : (Sint16)y;                     \
+            xmin = (xmin < (Sint16)x) ? xmin : (Sint16)x;                     \
+            ymin = (ymin < (Sint16)y) ? ymin : (Sint16)y;                     \
+        }                                                                     \
+        xp = x;                                                               \
+        yp = y;                                                               \
+    }
+
+void ttk_bezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3, int y3,
+                int x4, int y4, int level, ttk_color col) {
+    DO_BEZIER(ttk_line(srf, (short)xp, (short)yp, (short)x, (short)y, col));
+}
+void ttk_bezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
+                   int x3, int y3, int x4, int y4, int level) {
+    ttk_bezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
+}
+
+void ttk_aabezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3,
+                  int y3, int x4, int y4, int level, ttk_color col) {
+    DO_BEZIER(ttk_aaline(srf, (short)xp, (short)yp, (short)x, (short)y, col));
+}
+void ttk_aabezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
+                     int x3, int y3, int x4, int y4, int level) {
+    ttk_aabezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
+}
+
+void ttk_fillpoly(ttk_surface srf, int nv, short* vx, short* vy,
+                  ttk_color col) {
+    filledPolygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
+}
+void ttk_fillpoly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
+    int i;
+    short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
+    if (!vx || !vy) {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
+
+    for (i = 0; i < n; i++) {
+        vx[i] = v[i].x;
+        vy[i] = v[i].y;
+    }
+
+    filledPolygonColor(srf, vx, vy, n, fetchcolor(col));
+
+    free(vx);
+    free(vy);
+}
+void ttk_fillpoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
+    ttk_fillpoly_pt(srf, v, n, gc->fg);
+}
+
+void ttk_ellipse(ttk_surface srf, int x, int y, int rx, int ry, ttk_color col) {
+    if (rx == ry) {
+        circleColor(srf, x, y, rx, fetchcolor(col));
+    } else {
+        ellipseColor(srf, x, y, rx, ry, fetchcolor(col));
+    }
+}
+void ttk_ellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx, int ry) {
+    if (rx == ry) {
+        circleColor(srf, x, y, rx, fetchcolor(gc->fg));
+    } else {
+        ellipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
+    }
+}
+
+void ttk_aaellipse(ttk_surface srf, int x, int y, int rx, int ry,
+                   ttk_color col) {
+    if (rx == ry) {
+        aacircleColor(srf, x, y, rx, fetchcolor(col));
+    } else {
+        aaellipseColor(srf, x, y, rx, ry, fetchcolor(col));
+    }
+}
+void ttk_aaellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
+                      int ry) {
+    if (rx == ry) {
+        aacircleColor(srf, x, y, rx, fetchcolor(gc->fg));
+    } else {
+        aaellipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
+    }
+}
+
+void ttk_fillellipse(ttk_surface srf, int x, int y, int rx, int ry,
+                     ttk_color col) {
+    if (rx == ry) {
+        filledCircleColor(srf, x, y, rx, fetchcolor(col));
+    } else {
+        filledEllipseColor(srf, x, y, rx, ry, fetchcolor(col));
+    }
+}
+void ttk_fillellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
+                        int ry) {
+    if (rx == ry) {
+        filledCircleColor(srf, x, y, rx, fetchcolor(gc->fg));
+    } else {
+        filledEllipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
+    }
+}
+
+void ttk_aafillellipse(ttk_surface srf, int xc, int yc, int rx, int ry,
+                       ttk_color col) {
+    // Stub or simple implementation for now to satisfy linker if needed
+    // Using filled ellipse as fallback
+    ttk_fillellipse(srf, xc, yc, rx, ry, col);
+}
+
+void ttk_aafillellipse_gc(ttk_surface srf, ttk_gc gc, int xc, int yc, int rx,
+                          int ry) {
+    ttk_aafillellipse(srf, xc, yc, rx, ry, gc->fg);
+}
+
+// Font loading stubs (simplified for brevity, assumes SDL_ttf or SFont
+// available) For full functionality, copy load_fnt/pcf/fff from sdl.c
+void ttk_load_font(ttk_fontinfo* fi, const char* fnbase, int size) {
+    // Minimal implementation: fail or use SDL_ttf if available
+    // In a real scenario, copy the font loading logic from sdl.c
+    fprintf(stderr, "ttk_load_font not fully implemented in waveshare.c\n");
+    fi->good = 0;
+}
+void ttk_unload_font(ttk_fontinfo* fi) {
+    if (fi->f) free(fi->f);
+    fi->loaded = 0;
+}
+
+void ttk_text(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+              const char* str) {
+    // Stub: implement using font->draw
+}
+void ttk_text_gc(ttk_surface srf, ttk_gc gc, int x, int y, const char* str) {
+    // Stub
+}
+int ttk_text_width(ttk_font fnt, const char* str) { return 0; }
+int ttk_text_height(ttk_font fnt) { return 0; }
+int ttk_text_width_gc(ttk_gc gc, const char* str) { return 0; }
+int ttk_text_height_gc(ttk_gc gc) { return 0; }
+
+ttk_surface ttk_load_image(const char* path) { return SDL_LoadBMP(path); }
+void ttk_free_image(ttk_surface img) { SDL_FreeSurface(img); }
+void ttk_blit_image(ttk_surface src, ttk_surface dst, int dx, int dy) {
+    SDL_Rect dr = {dx, dy, 0, 0};
+    SDL_BlitSurface(src, 0, dst, &dr);
+}
+void ttk_blit_image_ex(ttk_surface src, int sx, int sy, int sw, int sh,
+                       ttk_surface dst, int dx, int dy) {
+    SDL_Rect sr = {sx, sy, sw, sh};
+    SDL_Rect dr = {dx, dy, 0, 0};
+    SDL_BlitSurface(src, &sr, dst, &dr);
+}
+
+ttk_surface ttk_new_surface(int w, int h, int bpp) {
+    return SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 16, 0xF800, 0x07E0, 0x001F,
+                                0);
+}
+void ttk_free_surface(ttk_surface srf) { SDL_FreeSurface(srf); }
+void ttk_surface_get_dimen(ttk_surface srf, int* w, int* h) {
+    if (w) *w = srf->w;
+    if (h) *h = srf->h;
+}
+
 ttk_surface ttk_scale_surface(ttk_surface srf, float factor) {
     // Requires SDL_rotozoom
-    return NULL; 
+    return NULL;
+    return zoomSurface(srf, factor, factor, 1);
 }
