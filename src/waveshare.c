@@ -7,7 +7,9 @@
 
 #include <SDL.h>
 #include <SDL_image.h>
+#ifndef NO_TF
 #include <SDL_ttf.h>
+#endif
 #include <lgpio.h>
 #include <stdarg.h>
 #include <stdio.h>
