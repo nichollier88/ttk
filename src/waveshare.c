@@ -112,6 +112,21 @@ void ttk_gfx_update(ttk_surface srf) {
 
 int ttk_get_rawevent(int* arg) { return TTK_NO_EVENT; }
 
+// #define TTK_NO_EVENT     0
+// #define TTK_BUTTON_DOWN  1
+// #define TTK_BUTTON_UP    2
+// #define TTK_SCROLL       3
+// #define TTK_TOUCH        4
+// #define TTK_LIFT         5
+// #define TTK_TAP          6
+
+// #define TTK_BUTTON_ACTION   '\n'
+// #define TTK_BUTTON_PREVIOUS 'w'
+// #define TTK_BUTTON_NEXT     'f'
+// #define TTK_BUTTON_MENU     'm'
+// #define TTK_BUTTON_PLAY     'd'
+// #define TTK_BUTTON_HOLD     'h'
+
 int ttk_get_event(int* arg) {
     static uint32_t last_time = 0;
     uint32_t current_time = SDL_GetTicks();
@@ -131,9 +146,9 @@ int ttk_get_event(int* arg) {
                       TTK_BUTTON_PREVIOUS,
                       TTK_BUTTON_NEXT,
                       TTK_BUTTON_ACTION,
+                      '-1',
                       '1',
-                      '2',
-                      '3'};
+                      '0'};
 
     for (int i = 0; i < 8; i++) {
         switch(i) {
@@ -153,11 +168,13 @@ int ttk_get_event(int* arg) {
         if (val == 0 && button_states[ttk_btn] == 0) {
             button_states[ttk_btn] = 1;
             *arg = ttk_btn;
+            if (i == 5 || i == 6) return TTK_SCROLL;
             return TTK_BUTTON_DOWN;
         }
         if (val == 1 && button_states[ttk_btn] == 1) {
             button_states[ttk_btn] = 0;
             *arg = ttk_btn;
+            if (i == 5 || i == 6) return TTK_SCROLL;
             return TTK_BUTTON_UP;
         }
     }
