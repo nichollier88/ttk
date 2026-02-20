@@ -181,7 +181,7 @@ void Paint_SetPixel(UWORD Xpoint, UWORD Ypoint, UWORD Color)
     if(Paint.Depth == 1){
         UDOUBLE Addr = X / 8 + Y * Paint.WidthByte;
         UBYTE Rdata = Paint.Image[Addr];
-        if(Color == BLACK)
+        if(Color == WS_BLACK)
             Paint.Image[Addr] = Rdata & ~(0x80 >> (X % 8));
         else
             Paint.Image[Addr] = Rdata | (0x80 >> (X % 8));
@@ -304,9 +304,9 @@ void Paint_DrawLine(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend,
         if (Line_Style == LINE_STYLE_DOTTED && Dotted_Len % 3 == 0) {
             //DEBUG("LINE_DOTTED\r\n");
             if(Color)
-				Paint_DrawPoint(Xpoint, Ypoint, BLACK, Line_width, DOT_STYLE_DFT);
+				Paint_DrawPoint(Xpoint, Ypoint, WS_BLACK, Line_width, DOT_STYLE_DFT);
             else
-				Paint_DrawPoint(Xpoint, Ypoint, WHITE, Line_width, DOT_STYLE_DFT);
+				Paint_DrawPoint(Xpoint, Ypoint, WS_WHITE, Line_width, DOT_STYLE_DFT);
             Dotted_Len = 0;
         } else {
             Paint_DrawPoint(Xpoint, Ypoint, Color, Line_width, DOT_STYLE_DFT);

@@ -45,7 +45,7 @@ void ttk_gfx_init() {
     }
 
     LCD_1in44_Init(SCAN_DIR_DFT);
-    LCD_1in44_Clear(WHITE);
+    LCD_1in44_Clear(WS_WHITE);
 
     // Init SDL for software surface (headless)
     if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE) < 0) {
@@ -269,7 +269,7 @@ static void SetupPaint(ttk_surface srf) {
     // Note: Paint_NewImage resets rotation and other properties.
     // We assume stride (WidthByte) matches width for 16bpp if pitch is width*2.
     // SDL pitch is in bytes.
-    Paint_NewImage((UWORD*)srf->pixels, srf->w, srf->h, ROTATE_0, WHITE, 16);
+    Paint_NewImage((UWORD*)srf->pixels, srf->w, srf->h, ROTATE_0, WS_WHITE, 16);
     // Adjust stride if necessary (SDL pitch might include padding)
     Paint.WidthByte = srf->pitch / 2;
 }
