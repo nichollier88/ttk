@@ -115,6 +115,7 @@ elseif(GFXLIB STREQUAL "mwin")
     list(APPEND TTK_SOURCES mwin.c)
 
 elseif(GFXLIB STREQUAL "waveshare")
+    add_definitions(-DWAVESHARE)
     include_directories(waveshare)
     add_definitions(-DSDL -DUSE_DEV_LIB)
     list(APPEND TTK_SOURCES 

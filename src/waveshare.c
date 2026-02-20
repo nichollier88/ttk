@@ -65,7 +65,7 @@ void ttk_gfx_init() {
     // Force TTK screen info to match HAT
     ttk_screen->w = 128;
     ttk_screen->h = 128;
-    ttk_screen->bpp = 16;
+    ttk_screen->bpp = 2;
 
     SDL_EnableUNICODE(1);
 }

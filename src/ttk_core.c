@@ -122,6 +122,10 @@ TWindow* ttk_init() {
             free(ttk_screen);
             exit(1);
         }
+#elif defined(WAVESHARE)
+        ttk_screen->w = 128;
+        ttk_screen->h = 128;
+        ttk_screen->bpp = 2;
 #else
         ttk_screen->w = 160;
         ttk_screen->h = 128;
