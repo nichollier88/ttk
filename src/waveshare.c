@@ -21,11 +21,10 @@
 #include "ttk/SDL_gfxPrimitives.h"
 #include "ttk/SDL_rotozoom.h"
 #include "ttk/SFont.h"
-
 #include "waveshare/DEV_Config.h"
-#include "waveshare/LCD_1in44.h"
-#include "waveshare/GUI_Paint.h"
 #include "waveshare/GUI_BMP.h"
+#include "waveshare/GUI_Paint.h"
+#include "waveshare/LCD_1in44.h"
 
 extern ttk_screeninfo* ttk_screen;
 
@@ -104,7 +103,7 @@ void ttk_gfx_update(ttk_surface srf) {
     }
 
     // fflush(stdout);
-    
+
     LCD_1in44_Display((UWORD*)pixels);
 
     if (SDL_MUSTLOCK(srf)) SDL_UnlockSurface(srf);
@@ -146,35 +145,56 @@ int ttk_get_event(int* arg) {
                       TTK_BUTTON_PREVIOUS,
                       TTK_BUTTON_NEXT,
                       TTK_BUTTON_ACTION,
-                      '-1',
                       '1',
-                      '0'};
+                      '2',
+                      '3'};
 
     for (int i = 0; i < 8; i++) {
-        switch(i) {
-            case 0: val = GET_KEY_UP; break;
-            case 1: val = GET_KEY_DOWN; break;
-            case 2: val = GET_KEY_LEFT; break;
-            case 3: val = GET_KEY_RIGHT; break;
-            case 4: val = GET_KEY_PRESS; break;
-            case 5: val = GET_KEY1; break;
-            case 6: val = GET_KEY2; break;
-            case 7: val = GET_KEY3; break;
-            default: val = 1; break;
+        switch (i) {
+            case 0:
+                val = GET_KEY_UP;
+                break;
+            case 1:
+                val = GET_KEY_DOWN;
+                break;
+            case 2:
+                val = GET_KEY_LEFT;
+                break;
+            case 3:
+                val = GET_KEY_RIGHT;
+                break;
+            case 4:
+                val = GET_KEY_PRESS;
+                break;
+            case 5:
+                val = GET_KEY1;
+                break;
+            case 6:
+                val = GET_KEY2;
+                break;
+            case 7:
+                val = GET_KEY3;
+                break;
+            default:
+                val = 1;
+                break;
         }
-        
+
         int ttk_btn = ttk_btns[i];
+
+        int sroll_event = (i == 5 || i == 6);
+        *arg = (i == 5) ? -1 : 1;
 
         if (val == 0 && button_states[ttk_btn] == 0) {
             button_states[ttk_btn] = 1;
+            if (sroll_event) return TTK_SCROLL;
             *arg = ttk_btn;
-            if (i == 5 || i == 6) return TTK_SCROLL;
             return TTK_BUTTON_DOWN;
         }
         if (val == 1 && button_states[ttk_btn] == 1) {
             button_states[ttk_btn] = 0;
+            if (sroll_event) return TTK_SCROLL;
             *arg = ttk_btn;
-            if (i == 5 || i == 6) return TTK_SCROLL;
             return TTK_BUTTON_UP;
         }
     }
@@ -268,7 +288,8 @@ void ttk_line(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
 }
 void ttk_line_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
     SetupPaint(srf);
-    Paint_DrawLine(x1, y1, x2, y2, (UWORD)gc->fg, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+    Paint_DrawLine(x1, y1, x2, y2, (UWORD)gc->fg, DOT_PIXEL_1X1,
+                   LINE_STYLE_SOLID);
 }
 
 void ttk_aaline(ttk_surface srf, int x1, int y1, int x2, int y2,
@@ -282,21 +303,25 @@ void ttk_aaline_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
 
 void ttk_rect(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
     SetupPaint(srf);
-    Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+    Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1,
+                        DRAW_FILL_EMPTY);
 }
 void ttk_rect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
     SetupPaint(srf);
-    Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+    Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg,
+                        DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 }
 
 void ttk_fillrect(ttk_surface srf, int x1, int y1, int x2, int y2,
                   ttk_color col) {
     SetupPaint(srf);
-    Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1,
+                        DRAW_FILL_FULL);
 }
 void ttk_fillrect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
     SetupPaint(srf);
-    Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg,
+                        DOT_PIXEL_1X1, DRAW_FILL_FULL);
 }
 
 extern unsigned char ttk_chamfering[][10];
