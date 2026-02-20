@@ -182,18 +182,19 @@ int ttk_get_event(int* arg) {
 
         int ttk_btn = ttk_btns[i];
 
-        int sroll_event = (i == 5 || i == 6);
-        *arg = (i == 5) ? -1 : 1;
-
         if (val == 0 && button_states[ttk_btn] == 0) {
             button_states[ttk_btn] = 1;
-            if (sroll_event) return TTK_SCROLL;
+
+            if (i == 5 || i == 6) {
+                *arg = (i == 5) ? -1 : 1;
+                return TTK_SCROLL;
+            }
+            
             *arg = ttk_btn;
             return TTK_BUTTON_DOWN;
         }
         if (val == 1 && button_states[ttk_btn] == 1) {
             button_states[ttk_btn] = 0;
-            if (sroll_event) return TTK_SCROLL;
             *arg = ttk_btn;
             return TTK_BUTTON_UP;
         }
