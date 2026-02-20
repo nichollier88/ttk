@@ -1,7 +1,7 @@
 /*
  * src/waveshare.c
  *
- * TTK backend for Waveshare 1.44inch LCD HAT using bcm2835 library.
+ * TTK backend for Waveshare 1.44inch LCD HAT using Waveshare libraries.
  * Replaces sdl.c for this specific hardware.
  */
 
@@ -10,7 +10,6 @@
 #ifndef NO_TF
 #include <SDL_ttf.h>
 #endif
-#include <lgpio.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,30 +22,10 @@
 #include "ttk/SDL_rotozoom.h"
 #include "ttk/SFont.h"
 
-// Waveshare 1.44inch LCD HAT GPIOs (BCM)
-#define LCD_CS 8
-#define LCD_RST 27
-#define LCD_DC 25
-#define LCD_BL 24
-
-#define KEY_UP 6
-#define KEY_DOWN 19
-#define KEY_LEFT 5
-#define KEY_RIGHT 26
-#define KEY_PRESS 13
-#define KEY1 21
-#define KEY2 20
-#define KEY3 16
-
-// ST7735S commands
-#define ST7735_SWRESET 0x01
-#define ST7735_SLPOUT 0x11
-#define ST7735_DISPON 0x29
-#define ST7735_CASET 0x2A
-#define ST7735_RASET 0x2B
-#define ST7735_RAMWR 0x2C
-#define ST7735_MADCTL 0x36
-#define ST7735_COLMOD 0x3A
+#include "waveshare/DEV_Config.h"
+#include "waveshare/LCD_1in44.h"
+#include "waveshare/GUI_Paint.h"
+#include "waveshare/GUI_BMP.h"
 
 extern ttk_screeninfo* ttk_screen;
 
@@ -58,162 +37,16 @@ typedef struct sdl_additional {
 
 sdl_additional sdl_add = {0, 0};
 
-int GPIO_Handle;
-int SPI_Handle;
-
-// --- Hardware Interface ---
-
-static void LCD_Write_Command(uint8_t cmd) {
-    lgGpioWrite(GPIO_Handle, LCD_DC, 0);
-    lgSpiWrite(SPI_Handle, (char*)&cmd, 1);
-}
-
-static void LCD_Write_Data(uint8_t data) {
-    lgGpioWrite(GPIO_Handle, LCD_DC, 1);
-    lgSpiWrite(SPI_Handle, (char*)&data, 1);
-}
-
-static void LCD_Init_Reg(void) {
-    // ST7735S initialization sequence
-    LCD_Write_Command(ST7735_SWRESET);
-    lguSleep(0.120);
-
-    LCD_Write_Command(ST7735_SLPOUT);
-    lguSleep(0.120);
-
-    LCD_Write_Command(0xB1);  // Frame Rate Control 1
-    LCD_Write_Data(0x01);
-    LCD_Write_Data(0x2C);
-    LCD_Write_Data(0x2D);
-
-    LCD_Write_Command(0xB2);  // Frame Rate Control 2
-    LCD_Write_Data(0x01);
-    LCD_Write_Data(0x2C);
-    LCD_Write_Data(0x2D);
-
-    LCD_Write_Command(0xB3);  // Frame Rate Control 3
-    LCD_Write_Data(0x01);
-    LCD_Write_Data(0x2C);
-    LCD_Write_Data(0x2D);
-    LCD_Write_Data(0x01);
-    LCD_Write_Data(0x2C);
-    LCD_Write_Data(0x2D);
-
-    LCD_Write_Command(0xB4);  // Display Inversion Control
-    LCD_Write_Data(0x07);
-
-    LCD_Write_Command(0xC0);  // Power Control 1
-    LCD_Write_Data(0xA2);
-    LCD_Write_Data(0x02);
-    LCD_Write_Data(0x84);
-
-    LCD_Write_Command(0xC1);  // Power Control 2
-    LCD_Write_Data(0xC5);
-
-    LCD_Write_Command(0xC2);  // Power Control 3
-    LCD_Write_Data(0x0A);
-    LCD_Write_Data(0x00);
-
-    LCD_Write_Command(0xC3);  // Power Control 4
-    LCD_Write_Data(0x8A);
-    LCD_Write_Data(0x2A);
-
-    LCD_Write_Command(0xC4);  // Power Control 5
-    LCD_Write_Data(0x8A);
-    LCD_Write_Data(0xEE);
-
-    LCD_Write_Command(0xC5);  // VCOM Control 1
-    LCD_Write_Data(0x0E);
-
-    LCD_Write_Command(0x20);  // Display Inversion Off
-
-    LCD_Write_Command(ST7735_MADCTL);  // Memory Data Access Control
-    LCD_Write_Data(0xC8);              // BGR, MX, MY
-
-    LCD_Write_Command(ST7735_COLMOD);  // Interface Pixel Format
-    LCD_Write_Data(0x05);              // 16-bit/pixel
-
-    LCD_Write_Command(ST7735_DISPON);  // Display On
-    lguSleep(0.100);
-}
-
-static void LCD_SetWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
-    // Adjust for 1.44 inch LCD offsets (128x128 centered in 132x162)
-    uint8_t x_off = 2;
-    uint8_t y_off = 1;
-
-    LCD_Write_Command(ST7735_CASET);
-    LCD_Write_Data(0x00);
-    LCD_Write_Data(x0 + x_off);
-    LCD_Write_Data(0x00);
-    LCD_Write_Data(x1 + x_off);
-
-    LCD_Write_Command(ST7735_RASET);
-    LCD_Write_Data(0x00);
-    LCD_Write_Data(y0 + y_off);
-    LCD_Write_Data(0x00);
-    LCD_Write_Data(y1 + y_off);
-
-    LCD_Write_Command(ST7735_RAMWR);
-}
-
 // --- TTK Backend Implementation ---
 
 void ttk_gfx_init() {
-    char buffer[128];
-    FILE* fp;
-
-    fp = popen("cat /proc/cpuinfo | grep 'Raspberry Pi 5'", "r");
-    if (fp == NULL) {
-        fprintf(
-            stderr,
-            "It is not possible to determine the model of the Raspberry PI\n");
+    if (DEV_ModuleInit() != 0) {
+        fprintf(stderr, "DEV_ModuleInit failed\n");
         exit(1);
     }
 
-    if (fgets(buffer, sizeof(buffer), fp) != NULL) {
-        GPIO_Handle = lgGpiochipOpen(4);
-        if (GPIO_Handle < 0) {
-            fprintf(stderr, "gpiochip4 Export Failed\n");
-            exit(1);
-        }
-    } else {
-        GPIO_Handle = lgGpiochipOpen(0);
-        if (GPIO_Handle < 0) {
-            fprintf(stderr, "gpiochip0 Export Failed\n");
-            exit(1);
-        }
-    }
-    pclose(fp);
-
-    // Init SPI
-    SPI_Handle = lgSpiOpen(0, 0, 10000000, 0);
-    if (SPI_Handle < 0) {
-        fprintf(stderr, "lgSpiOpen Failed\n");
-        exit(1);
-    }
-
-    // Init GPIOs
-    lgGpioClaimOutput(GPIO_Handle, 0, LCD_RST, 0);
-    lgGpioClaimOutput(GPIO_Handle, 0, LCD_DC, 0);
-    lgGpioClaimOutput(GPIO_Handle, 0, LCD_BL, 0);
-
-    int inputs[] = {KEY_UP,    KEY_DOWN, KEY_LEFT, KEY_RIGHT,
-                    KEY_PRESS, KEY1,     KEY2,     KEY3};
-    for (int i = 0; i < 8; i++) {
-        lgGpioClaimInput(GPIO_Handle, 0, inputs[i]);
-    }
-
-    // Reset LCD
-    lgGpioWrite(GPIO_Handle, LCD_BL, 1);
-    lgGpioWrite(GPIO_Handle, LCD_RST, 1);
-    lguSleep(0.100);
-    lgGpioWrite(GPIO_Handle, LCD_RST, 0);
-    lguSleep(0.100);
-    lgGpioWrite(GPIO_Handle, LCD_RST, 1);
-    lguSleep(0.100);
-
-    LCD_Init_Reg();
+    LCD_1in44_Init(SCAN_DIR_DFT);
+    LCD_1in44_Clear(WHITE);
 
     // Init SDL for software surface (headless)
     if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE) < 0) {
@@ -238,8 +71,7 @@ void ttk_gfx_init() {
 }
 
 void ttk_gfx_quit() {
-    lgSpiClose(SPI_Handle);
-    lgGpiochipClose(GPIO_Handle);
+    DEV_ModuleExit();
     SDL_Quit();
 }
 
@@ -247,9 +79,6 @@ void ttk_gfx_update(ttk_surface srf) {
     if (!srf) return;
 
     if (SDL_MUSTLOCK(srf)) SDL_LockSurface(srf);
-
-    LCD_SetWindow(0, 0, 127, 127);
-    lgGpioWrite(GPIO_Handle, LCD_DC, 1);
 
     uint16_t* pixels = (uint16_t*)srf->pixels;
     int count = 128 * 128;
@@ -276,7 +105,7 @@ void ttk_gfx_update(ttk_surface srf) {
 
     fflush(stdout);
     
-    lgSpiWrite(SPI_Handle, (char*)buffer, count * 2);
+    LCD_1in44_Display((UWORD*)pixels);
 
     if (SDL_MUSTLOCK(srf)) SDL_UnlockSurface(srf);
 }
@@ -295,8 +124,8 @@ int ttk_get_event(int* arg) {
 
     // State tracking for button up/down events
     static int button_states[128] = {0};
-    int buttons[] = {KEY_UP,    KEY_DOWN, KEY_LEFT, KEY_RIGHT,
-                     KEY_PRESS, KEY1,     KEY2,     KEY3};
+    // Using macros from DEV_Config.h
+    int val;
     int ttk_btns[] = {TTK_BUTTON_MENU,
                       TTK_BUTTON_PLAY,
                       TTK_BUTTON_PREVIOUS,
@@ -307,8 +136,18 @@ int ttk_get_event(int* arg) {
                       '3'};
 
     for (int i = 0; i < 8; i++) {
-        int pin = buttons[i];
-        int val = lgGpioRead(GPIO_Handle, pin);  // Active LOW
+        switch(i) {
+            case 0: val = GET_KEY_UP; break;
+            case 1: val = GET_KEY_DOWN; break;
+            case 2: val = GET_KEY_LEFT; break;
+            case 3: val = GET_KEY_RIGHT; break;
+            case 4: val = GET_KEY_PRESS; break;
+            case 5: val = GET_KEY1; break;
+            case 6: val = GET_KEY2; break;
+            case 7: val = GET_KEY3; break;
+            default: val = 1; break;
+        }
+        
         int ttk_btn = ttk_btns[i];
 
         if (val == 0 && button_states[ttk_btn] == 0) {
@@ -387,41 +226,60 @@ ttk_color ttk_getpixel(ttk_surface srf, int x, int y) {
     return 0;
 }
 
+static void SetupPaint(ttk_surface srf) {
+    // Configure Paint to draw onto the SDL surface's buffer
+    // Note: Paint_NewImage resets rotation and other properties.
+    // We assume stride (WidthByte) matches width for 16bpp if pitch is width*2.
+    // SDL pitch is in bytes.
+    Paint_NewImage((UWORD*)srf->pixels, srf->w, srf->h, ROTATE_0, WHITE, 16);
+    // Adjust stride if necessary (SDL pitch might include padding)
+    Paint.WidthByte = srf->pitch / 2;
+}
+
 void ttk_pixel(ttk_surface srf, int x, int y, ttk_color col) {
-    pixelColor(srf, x, y, fetchcolor(col));
+    SetupPaint(srf);
+    Paint_SetPixel(x, y, (UWORD)col);
 }
 void ttk_pixel_gc(ttk_surface srf, ttk_gc gc, int x, int y) {
-    pixelColor(srf, x, y, fetchcolor(gc->fg));
+    SetupPaint(srf);
+    Paint_SetPixel(x, y, (UWORD)gc->fg);
 }
 
 void ttk_line(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
-    lineColor(srf, x1, y1, x2, y2, fetchcolor(col));
+    SetupPaint(srf);
+    Paint_DrawLine(x1, y1, x2, y2, (UWORD)col, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
 }
 void ttk_line_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
-    lineColor(srf, x1, y1, x2, y2, fetchcolor(gc->fg));
+    SetupPaint(srf);
+    Paint_DrawLine(x1, y1, x2, y2, (UWORD)gc->fg, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
 }
 
 void ttk_aaline(ttk_surface srf, int x1, int y1, int x2, int y2,
                 ttk_color col) {
-    aalineColor(srf, x1, y1, x2, y2, fetchcolor(col));
+    // GUI_Paint doesn't support AA lines, fallback to normal line
+    ttk_line(srf, x1, y1, x2, y2, col);
 }
 void ttk_aaline_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
-    aalineColor(srf, x1, y1, x2, y2, fetchcolor(gc->fg));
+    ttk_line_gc(srf, gc, x1, y1, x2, y2);
 }
 
 void ttk_rect(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
-    rectangleColor(srf, x1, y1, x2, y2, fetchcolor(col));
+    SetupPaint(srf);
+    Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 }
 void ttk_rect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
-    rectangleColor(srf, x, y, x + w, y + h, fetchcolor(gc->fg));
+    SetupPaint(srf);
+    Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 }
 
 void ttk_fillrect(ttk_surface srf, int x1, int y1, int x2, int y2,
                   ttk_color col) {
-    boxColor(srf, x1, y1, x2, y2, fetchcolor(col));
+    SetupPaint(srf);
+    Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 }
 void ttk_fillrect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
-    boxColor(srf, x, y, x + w, y + h, fetchcolor(gc->fg));
+    SetupPaint(srf);
+    Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 }
 
 extern unsigned char ttk_chamfering[][10];
@@ -490,7 +348,7 @@ static void draw_bitmap(ttk_surface srf, int x, int y, int width, int height,
             bitcount = 16;
             bitvalue = *imagebits++;
         }
-        if (bitvalue & (1 << 15)) pixelColor(srf, x, y, fetchcolor(color));
+        if (bitvalue & (1 << 15)) Paint_SetPixel(x, y, (UWORD)color);
         bitvalue <<= 1;
         bitcount--;
 
@@ -505,10 +363,12 @@ static void draw_bitmap(ttk_surface srf, int x, int y, int width, int height,
 
 void ttk_bitmap(ttk_surface srf, int x, int y, int w, int h,
                 unsigned short* imagebits, ttk_color col) {
+    SetupPaint(srf);
     draw_bitmap(srf, x, y, w, h, imagebits, col);
 }
 void ttk_bitmap_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h,
                    unsigned short* imagebits) {
+    SetupPaint(srf);
     draw_bitmap(srf, x, y, w, h, imagebits, gc->fg);
 }
 
@@ -695,52 +555,33 @@ void ttk_fillpoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
 }
 
 void ttk_ellipse(ttk_surface srf, int x, int y, int rx, int ry, ttk_color col) {
-    if (rx == ry) {
-        circleColor(srf, x, y, rx, fetchcolor(col));
-    } else {
-        ellipseColor(srf, x, y, rx, ry, fetchcolor(col));
-    }
+    SetupPaint(srf);
+    Paint_DrawCircle(x, y, rx, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 }
 void ttk_ellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx, int ry) {
-    if (rx == ry) {
-        circleColor(srf, x, y, rx, fetchcolor(gc->fg));
-    } else {
-        ellipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
-    }
+    SetupPaint(srf);
+    Paint_DrawCircle(x, y, rx, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 }
 
 void ttk_aaellipse(ttk_surface srf, int x, int y, int rx, int ry,
                    ttk_color col) {
-    if (rx == ry) {
-        aacircleColor(srf, x, y, rx, fetchcolor(col));
-    } else {
-        aaellipseColor(srf, x, y, rx, ry, fetchcolor(col));
-    }
+    // Fallback to normal ellipse
+    ttk_ellipse(srf, x, y, rx, ry, col);
 }
 void ttk_aaellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
                       int ry) {
-    if (rx == ry) {
-        aacircleColor(srf, x, y, rx, fetchcolor(gc->fg));
-    } else {
-        aaellipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
-    }
+    ttk_ellipse_gc(srf, gc, x, y, rx, ry);
 }
 
 void ttk_fillellipse(ttk_surface srf, int x, int y, int rx, int ry,
                      ttk_color col) {
-    if (rx == ry) {
-        filledCircleColor(srf, x, y, rx, fetchcolor(col));
-    } else {
-        filledEllipseColor(srf, x, y, rx, ry, fetchcolor(col));
-    }
+    SetupPaint(srf);
+    Paint_DrawCircle(x, y, rx, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 }
 void ttk_fillellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
                         int ry) {
-    if (rx == ry) {
-        filledCircleColor(srf, x, y, rx, fetchcolor(gc->fg));
-    } else {
-        filledEllipseColor(srf, x, y, rx, ry, fetchcolor(gc->fg));
-    }
+    SetupPaint(srf);
+    Paint_DrawCircle(x, y, rx, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 }
 
 void ttk_aafillellipse(ttk_surface srf, int xc, int yc, int rx, int ry,

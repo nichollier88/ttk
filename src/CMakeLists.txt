@@ -52,18 +52,6 @@ set(TTK_SOURCES
     gradient.c
 )
 
-# set(TTK_SOURCES
-#     ttk.c
-#     menu.c
-#     icons.c
-#     slider.c
-#     imgview.c
-#     textarea.c
-#     ${FLEX_SOURCE}
-#     mwin-emu.c
-#     gradient.c
-# )
-
 if(TTF)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL_ttf.c")
         list(APPEND TTK_SOURCES SDL_ttf.c)
@@ -98,7 +86,12 @@ if(GFXLIB STREQUAL "hotdog")
 
 elseif(GFXLIB STREQUAL "SDL")
     add_definitions(-DSDL)
-    list(APPEND TTK_SOURCES sdl.c SDL_gfxPrimitives.c SDL_gfxPrimitives_Byte.c SDL_rotozoom.c SFont.c)
+    list(APPEND TTK_SOURCES 
+        sdl.c 
+        SDL_gfxPrimitives.c 
+        SDL_gfxPrimitives_Byte.c 
+        SDL_rotozoom.c 
+        SFont.c)
     
     if(IPOD)
         include_directories(../sdlincludes)
@@ -122,8 +115,18 @@ elseif(GFXLIB STREQUAL "mwin")
     list(APPEND TTK_SOURCES mwin.c)
 
 elseif(GFXLIB STREQUAL "waveshare")
-    add_definitions(-DSDL)
-    list(APPEND TTK_SOURCES waveshare.c SDL_gfxPrimitives.c SDL_gfxPrimitives_Byte.c SDL_rotozoom.c SFont.c)
+    include_directories(waveshare)
+    add_definitions(-DSDL -DUSE_DEV_LIB)
+    list(APPEND TTK_SOURCES 
+        waveshare.c 
+        SDL_gfxPrimitives.c 
+        SDL_gfxPrimitives_Byte.c 
+        SDL_rotozoom.c 
+        SFont.c 
+        waveshare/DEV_Config.c 
+        waveshare/LCD_1in44.c 
+        waveshare/GUI_Paint.c 
+        waveshare/GUI_BMP.c)
 
     if(IPOD)
         include_directories(../sdlincludes)
