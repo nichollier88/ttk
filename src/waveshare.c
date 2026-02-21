@@ -64,7 +64,7 @@ void ttk_gfx_init() {
     // Force TTK screen info to match HAT
     ttk_screen->w = 128;
     ttk_screen->h = 128;
-    ttk_screen->bpp = 2;
+    ttk_screen->bpp = 16;
 
     SDL_EnableUNICODE(1);
 }
@@ -84,25 +84,29 @@ void ttk_gfx_update(ttk_surface srf) {
 
     // Buffer for SPI transfer (swap bytes for big-endian display)
     static uint8_t buffer[128 * 128 * 2];
-    // printf("\033[H");
     for (int i = 0; i < count; i++) {
         uint16_t p = pixels[i];
         buffer[i * 2] = (p >> 8) & 0xFF;
         buffer[i * 2 + 1] = p & 0xFF;
-
-        // uint8_t r = (p >> 11) & 0x1F;
-        // uint8_t g = (p >> 5) & 0x3F;
-        // uint8_t b = p & 0x1F;
-
-        // r = (r << 3) | (r >> 2);
-        // g = (g << 2) | (g >> 4);
-        // b = (b << 3) | (b >> 2);
-
-        // printf("\033[48;2;%d;%d;%dm  ", r, g, b);
-        // if ((i + 1) % 128 == 0) printf("\033[0m\n");
     }
 
-    // fflush(stdout);
+#ifdef PRINT_SURFACE_STDOUT
+    printf("\033[H");
+    for (int i = 0; i < count; i++) {
+        uint16_t p = pixels[i];
+        uint8_t r = (p >> 11) & 0x1F;
+        uint8_t g = (p >> 5) & 0x3F;
+        uint8_t b = p & 0x1F;
+
+        r = (r << 3) | (r >> 2);
+        g = (g << 2) | (g >> 4);
+        b = (b << 3) | (b >> 2);
+
+        printf("\033[48;2;%d;%d;%dm  ", r, g, b);
+        if ((i + 1) % 128 == 0) printf("\033[0m\n");
+    }
+    fflush(stdout);
+#endif
 
     LCD_1in44_Display((UWORD*)pixels);
 

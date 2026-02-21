@@ -69,20 +69,20 @@ extern PAINT Paint;
 /**
  * image color
 **/
-#define WS_WHITE        0xFFFF
 #define WS_BLACK        0x0000
 #define WS_BLUE         0x001F
-#define WS_BRED         0XF81F
-#define WS_GRED         0XFFE0
-#define WS_GBLUE        0X07FF
-#define WS_RED          0xF800
-#define WS_MAGENTA      0xF81F
 #define WS_GREEN        0x07E0
+#define WS_GBLUE        0X07FF
 #define WS_CYAN         0x7FFF
-#define WS_YELLOW       0xFFE0
-#define WS_BROWN        0XBC40
-#define WS_BRRED        0XFC07
 #define WS_GRAY         0X8430
+#define WS_BROWN        0XBC40
+#define WS_RED          0xF800
+#define WS_BRED         0XF81F
+#define WS_MAGENTA      0xF81F
+#define WS_BRRED        0XFC07
+#define WS_YELLOW       0xFFE0
+#define WS_GRED         0XFFE0
+#define WS_WHITE        0xFFFF
 
 #define IMAGE_BACKGROUND    WS_WHITE
 #define FONT_FOREGROUND     WS_BLACK

@@ -128,6 +128,11 @@ parameter:
 ******************************************************************************/
 void Paint_SetPixel(UWORD Xpoint, UWORD Ypoint, UWORD Color)
 {
+    // if (Color != WS_BLACK || Color != WS_WHITE) {
+    //     DEBUG("Color: %d\r\n", Color);
+    //     assert(1);
+    // }
+
     if(Xpoint > Paint.Width || Ypoint > Paint.Height){
         DEBUG("Exceeding display boundaries\r\n");
         return;
