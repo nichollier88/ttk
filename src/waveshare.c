@@ -303,7 +303,7 @@ static void SetupPaint(ttk_surface srf) {
 
 /* Set pixel at (x, y) */
 void ttk_pixel(ttk_surface srf, int x, int y, ttk_color col) {
-    // SetupPaint(srf);
+    SetupPaint(srf);
     pixelColor(srf, x, y, fetchcolor(col));
     Paint_SetPixel(x, y, (UWORD)col);
 }
@@ -314,7 +314,7 @@ void ttk_pixel_gc(ttk_surface srf, ttk_gc gc, int x, int y) {
 }
 
 void ttk_line(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
-    // SetupPaint(srf);
+    SetupPaint(srf);
     lineColor(srf, x1, y1, x2, y2, fetchcolor(col));
     Paint_DrawLine(x1, y1, x2, y2, (UWORD)col, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
 }
@@ -328,14 +328,14 @@ void ttk_line_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
 void ttk_aaline(ttk_surface srf, int x1, int y1, int x2, int y2,
                 ttk_color col) {
     // GUI_Paint doesn't support AA lines, fallback to normal line
-    ttk_line(srf, x1, y1, x2, y2, fetchcolor(col));
+    ttk_line(srf, x1, y1, x2, y2, col);
 }
 void ttk_aaline_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
-    ttk_line_gc(srf, gc, x1, y1, x2, y2);
+    ttk_aaline(srf, x1, y1, x2, y2, gc->fg);
 }
 
 void ttk_rect(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
-    // SetupPaint(srf);
+    SetupPaint(srf);
     rectangleColor(srf, x1, y1, x2, y2, fetchcolor(col));
     Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1,
                         DRAW_FILL_EMPTY);
@@ -349,7 +349,7 @@ void ttk_rect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
 
 void ttk_fillrect(ttk_surface srf, int x1, int y1, int x2, int y2,
                   ttk_color col) {
-    // SetupPaint(srf);
+    SetupPaint(srf);
     boxColor(srf, x1, y1, x2, y2, fetchcolor(col));
     Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1,
                         DRAW_FILL_FULL);
