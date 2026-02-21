@@ -26,6 +26,20 @@
 #include "waveshare/GUI_Paint.h"
 #include "waveshare/LCD_1in44.h"
 
+typedef struct Bitmap_Font {
+    char* name;
+    int maxwidth;
+    unsigned int height;
+    int ascent;
+    int firstchar;
+    int size;
+    const unsigned short* bits;
+    const unsigned long* offset;
+    const unsigned char* width;
+    int defaultchar;
+    long bits_size;
+} Bitmap_Font;
+
 extern ttk_screeninfo* ttk_screen;
 
 // SDL Additional flags (kept for compatibility with ttk_core)
@@ -38,6 +52,7 @@ sdl_additional sdl_add = {0, 0};
 
 // --- TTK Backend Implementation ---
 
+/* Initialize SDL video, timer, and set up the screen surface */
 void ttk_gfx_init() {
     if (DEV_ModuleInit() != 0) {
         fprintf(stderr, "DEV_ModuleInit failed\n");
@@ -208,6 +223,7 @@ int ttk_get_event(int* arg) {
 }
 
 int ttk_getticks() { return SDL_GetTicks(); }
+
 void ttk_delay(int ms) { SDL_Delay(ms); }
 
 // --- Drawing Primitives (Wrappers for SDL_gfx) ---
@@ -216,19 +232,23 @@ void ttk_delay(int ms) { SDL_Delay(ms); }
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #endif
 
+/* Creates a color value from RGB components */
 ttk_color ttk_makecol(int r, int g, int b) {
     return ttk_makecol_ex(r, g, b, 0);
 }
 
+/* Creates a color value from RGB components for a specific surface */
 ttk_color ttk_makecol_ex(int r, int g, int b, ttk_surface srf) {
     if (!srf) srf = ttk_screen->srf;
     return SDL_MapRGB(srf->format, r, g, b);
 }
 
+/* Extracts RGB components from a color value */
 void ttk_unmakecol(ttk_color col, int* r, int* g, int* b) {
     ttk_unmakecol_ex(col, r, g, b, 0);
 }
 
+/* Extracts RGB components from a color value for a specific surface */
 void ttk_unmakecol_ex(ttk_color col, int* r, int* g, int* b, ttk_surface srf) {
     if (!srf) srf = ttk_screen->srf;
     Uint8 R, G, B;
@@ -238,6 +258,7 @@ void ttk_unmakecol_ex(ttk_color col, int* r, int* g, int* b, ttk_surface srf) {
     *b = B;
 }
 
+/* Graphics Context (GC) management functions */
 ttk_gc ttk_new_gc() { return (ttk_gc)calloc(1, sizeof(struct _ttk_gc)); }
 ttk_gc ttk_copy_gc(ttk_gc other) {
     ttk_gc ret = malloc(sizeof(struct _ttk_gc));
@@ -254,9 +275,11 @@ void ttk_gc_set_usebg(ttk_gc gc, int flag) { gc->usebg = flag; }
 void ttk_gc_set_xormode(ttk_gc gc, int flag) { gc->xormode = flag; }
 void ttk_free_gc(ttk_gc gc) { free(gc); }
 
+/* Helper to convert ttk_color to Uint32 for SDL_gfx primitives */
 static int fetchcolor(ttk_color col) {
     int ret = 0;
     Uint8 r, g, b;
+
     SDL_GetRGB(col, ttk_screen->srf->format, &r, &g, &b);
     ret = (r << 24) | (g << 16) | (b << 8) | 0xff;
     return ret;
@@ -278,59 +301,71 @@ static void SetupPaint(ttk_surface srf) {
     Paint.WidthByte = srf->pitch / 2;
 }
 
+/* Set pixel at (x, y) */
 void ttk_pixel(ttk_surface srf, int x, int y, ttk_color col) {
-    SetupPaint(srf);
+    // SetupPaint(srf);
+    pixelColor(srf, x, y, fetchcolor(col));
     Paint_SetPixel(x, y, (UWORD)col);
 }
 void ttk_pixel_gc(ttk_surface srf, ttk_gc gc, int x, int y) {
-    SetupPaint(srf);
-    Paint_SetPixel(x, y, (UWORD)gc->fg);
+    // SetupPaint(srf);
+    // Paint_SetPixel(x, y, (UWORD)gc->fg);
+    ttk_pixel(srf, x, y, gc->fg);
 }
 
 void ttk_line(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
-    SetupPaint(srf);
+    // SetupPaint(srf);
+    lineColor(srf, x1, y1, x2, y2, fetchcolor(col));
     Paint_DrawLine(x1, y1, x2, y2, (UWORD)col, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
 }
 void ttk_line_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
-    SetupPaint(srf);
-    Paint_DrawLine(x1, y1, x2, y2, (UWORD)gc->fg, DOT_PIXEL_1X1,
-                   LINE_STYLE_SOLID);
+    // SetupPaint(srf);
+    // Paint_DrawLine(x1, y1, x2, y2, (UWORD)gc->fg, DOT_PIXEL_1X1,
+    //                LINE_STYLE_SOLID);
+    ttk_line(srf, x1, y1, x2, y2, gc->fg);
 }
 
 void ttk_aaline(ttk_surface srf, int x1, int y1, int x2, int y2,
                 ttk_color col) {
     // GUI_Paint doesn't support AA lines, fallback to normal line
-    ttk_line(srf, x1, y1, x2, y2, col);
+    ttk_line(srf, x1, y1, x2, y2, fetchcolor(col));
 }
 void ttk_aaline_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2) {
     ttk_line_gc(srf, gc, x1, y1, x2, y2);
 }
 
 void ttk_rect(ttk_surface srf, int x1, int y1, int x2, int y2, ttk_color col) {
-    SetupPaint(srf);
+    // SetupPaint(srf);
+    rectangleColor(srf, x1, y1, x2, y2, fetchcolor(col));
     Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1,
                         DRAW_FILL_EMPTY);
 }
 void ttk_rect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
-    SetupPaint(srf);
-    Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg,
-                        DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+    // SetupPaint(srf);
+    // Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg,
+    //                     DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+    ttk_rect(srf, x, y, x + w, y + h, gc->fg);
 }
 
 void ttk_fillrect(ttk_surface srf, int x1, int y1, int x2, int y2,
                   ttk_color col) {
-    SetupPaint(srf);
+    // SetupPaint(srf);
+    boxColor(srf, x1, y1, x2, y2, fetchcolor(col));
     Paint_DrawRectangle(x1, y1, x2 - 1, y2 - 1, (UWORD)col, DOT_PIXEL_1X1,
                         DRAW_FILL_FULL);
 }
+
+/* Draw a filled rectangle using GC, supporting XOR mode */
 void ttk_fillrect_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h) {
-    SetupPaint(srf);
-    Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg,
-                        DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    // SetupPaint(srf);
+    // Paint_DrawRectangle(x, y, x + w - 1, y + h - 1, (UWORD)gc->fg,
+    //                     DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    ttk_fillrect(srf, x, y, x + w, y + h, gc->fg);
 }
 
 extern unsigned char ttk_chamfering[][10];
 
+/* Draws a gradient with optional rounded corners (chamfering) */
 void ttk_do_gradient(ttk_surface srf, char horiz, int b_rad, int e_rad, int x1,
                      int y1, int x2, int y2, ttk_color begin, ttk_color end) {
     gradient_node* gn = ttk_gradient_find_or_add(begin, end);
@@ -381,44 +416,7 @@ void ttk_vgradient(ttk_surface srf, int x1, int y1, int x2, int y2,
     ttk_do_gradient(srf, 0, 0, 0, x1, y1, x2, y2, top, bottom);
 }
 
-static void draw_bitmap(ttk_surface srf, int x, int y, int width, int height,
-                        const unsigned short* imagebits, ttk_color color) {
-    int minx, maxx;
-    unsigned short bitvalue = 0;
-    int bitcount;
-
-    minx = x;
-    maxx = x + width - 1;
-    bitcount = 0;
-    while (height > 0) {
-        if (bitcount <= 0) {
-            bitcount = 16;
-            bitvalue = *imagebits++;
-        }
-        if (bitvalue & (1 << 15)) Paint_SetPixel(x, y, (UWORD)color);
-        bitvalue <<= 1;
-        bitcount--;
-
-        if (x++ == maxx) {
-            x = minx;
-            y++;
-            --height;
-            bitcount = 0;
-        }
-    }
-}
-
-void ttk_bitmap(ttk_surface srf, int x, int y, int w, int h,
-                unsigned short* imagebits, ttk_color col) {
-    SetupPaint(srf);
-    draw_bitmap(srf, x, y, w, h, imagebits, col);
-}
-void ttk_bitmap_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h,
-                   unsigned short* imagebits) {
-    SetupPaint(srf);
-    draw_bitmap(srf, x, y, w, h, imagebits, gc->fg);
-}
-
+/* Draw a polygon */
 void ttk_poly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
     polygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
 }
@@ -444,6 +442,7 @@ void ttk_poly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_poly_pt(srf, v, n, gc->fg);
 }
 
+/* Draw an anti-aliased polygon */
 void ttk_aapoly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
     aapolygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
 }
@@ -469,6 +468,7 @@ void ttk_aapoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_aapoly_pt(srf, v, n, gc->fg);
 }
 
+/* Draw a polyline (open polygon) */
 void ttk_polyline(ttk_surface srf, int nv, short* vx, short* vy,
                   ttk_color col) {
     polylineColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
@@ -495,6 +495,7 @@ void ttk_polyline_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_polyline_pt(srf, v, n, gc->fg);
 }
 
+/* Macro for Bezier curve calculation */
 #define DO_BEZIER(function)                                                   \
     /*  Note: I don't think there is any great performance win in             \
      *  translating this to fixed-point integer math, most of the time        \
@@ -557,6 +558,7 @@ void ttk_polyline_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
         yp = y;                                                               \
     }
 
+/* Draw a Bezier curve */
 void ttk_bezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3, int y3,
                 int x4, int y4, int level, ttk_color col) {
     DO_BEZIER(ttk_line(srf, (short)xp, (short)yp, (short)x, (short)y, col));
@@ -566,6 +568,7 @@ void ttk_bezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
     ttk_bezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
 }
 
+/* Draw an anti-aliased Bezier curve */
 void ttk_aabezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3,
                   int y3, int x4, int y4, int level, ttk_color col) {
     DO_BEZIER(ttk_aaline(srf, (short)xp, (short)yp, (short)x, (short)y, col));
@@ -575,6 +578,7 @@ void ttk_aabezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
     ttk_aabezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
 }
 
+/* Draw a filled polygon */
 void ttk_fillpoly(ttk_surface srf, int nv, short* vx, short* vy,
                   ttk_color col) {
     filledPolygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
@@ -601,6 +605,7 @@ void ttk_fillpoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_fillpoly_pt(srf, v, n, gc->fg);
 }
 
+/* Draw an ellipse or circle */
 void ttk_ellipse(ttk_surface srf, int x, int y, int rx, int ry, ttk_color col) {
     SetupPaint(srf);
     Paint_DrawCircle(x, y, rx, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
@@ -620,6 +625,7 @@ void ttk_aaellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
     ttk_ellipse_gc(srf, gc, x, y, rx, ry);
 }
 
+/* Draw a filled ellipse or circle */
 void ttk_fillellipse(ttk_surface srf, int x, int y, int rx, int ry,
                      ttk_color col) {
     SetupPaint(srf);
@@ -631,6 +637,7 @@ void ttk_fillellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
     Paint_DrawCircle(x, y, rx, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 }
 
+/* Custom implementation to draw an anti-aliased filled ellipse */
 void ttk_aafillellipse(ttk_surface srf, int xc, int yc, int rx, int ry,
                        ttk_color col) {
     // Stub or simple implementation for now to satisfy linker if needed
@@ -643,20 +650,9 @@ void ttk_aafillellipse_gc(ttk_surface srf, ttk_gc gc, int xc, int yc, int rx,
     ttk_aafillellipse(srf, xc, yc, rx, ry, gc->fg);
 }
 
-typedef struct Bitmap_Font {
-    char* name;
-    int maxwidth;
-    unsigned int height;
-    int ascent;
-    int firstchar;
-    int size;
-    const unsigned short* bits;
-    const unsigned long* offset;
-    const unsigned char* width;
-    int defaultchar;
-    long bits_size;
-} Bitmap_Font;
+/**** Font stuff. Taken from Microwindows with minor modifications. ****/
 
+/* Helper functions to read data types from a file */
 static int read8(FILE* fp, unsigned char* cp) {
     int c;
     if ((c = getc(fp)) == EOF) return 0;
@@ -701,7 +697,9 @@ static int readstr_padded(FILE* fp, char* buf, int totlen) {
     return totlen;
 }
 
+/* Mostly copied from mwin */
 #define FNT_VERSION "RB11"
+/* Loads a .fnt bitmap font file */
 static void load_fnt(Bitmap_Font* bf, const char* fname) {
     FILE* fp = fopen(fname, "rb");
     int i;
@@ -717,17 +715,21 @@ static void load_fnt(Bitmap_Font* bf, const char* fname) {
         exit(1);
     }
 
+    /* read magic and version #*/
     memset(version, 0, sizeof(version));
     if (readstr(fp, version, 4) != 4) goto errout;
     if (strcmp(version, FNT_VERSION) != 0) goto errout;
 
+    /* internal font name*/
     if (readstr_padded(fp, name, 64) != 64) goto errout;
     bf->name = (char*)malloc(strlen(name) + 1);
     if (!bf->name) goto errout;
     strcpy(bf->name, name);
 
+    /* copyright, not currently stored*/
     if (readstr_padded(fp, copyright, 256) != 256) goto errout;
 
+    /* font info*/
     if (!read16(fp, &maxwidth)) goto errout;
     bf->maxwidth = maxwidth;
     if (!read16(fp, &height)) goto errout;
@@ -742,25 +744,31 @@ static void load_fnt(Bitmap_Font* bf, const char* fname) {
     if (!read32(fp, &size)) goto errout;
     bf->size = size;
 
+    /* variable font data sizes*/
+    /* # words of MWIMAGEBITS*/
     if (!read32(fp, &nbits)) goto errout;
     bf->bits = (unsigned short*)malloc(nbits * sizeof(unsigned short));
     if (!bf->bits) goto errout;
     bf->bits_size = nbits;
 
+    /* # longs of offset*/
     if (!read32(fp, &noffset)) goto errout;
     if (noffset) {
         bf->offset = (unsigned long*)malloc(noffset * sizeof(unsigned long));
         if (!bf->offset) goto errout;
     }
 
+    /* # bytes of width*/
     if (!read32(fp, &nwidth)) goto errout;
     if (nwidth) {
         bf->width = (unsigned char*)malloc(nwidth * sizeof(unsigned char));
         if (!bf->width) goto errout;
     }
 
+    /* variable font data*/
     for (i = 0; i < nbits; ++i)
         if (!read16(fp, (unsigned short*)&bf->bits[i])) goto errout;
+    /* pad to longword boundary*/
     if (ftell(fp) & 02)
         if (!read16(fp, (unsigned short*)&bf->bits[i])) goto errout;
     if (noffset)
@@ -771,7 +779,7 @@ static void load_fnt(Bitmap_Font* bf, const char* fname) {
             if (!read8(fp, (unsigned char*)&bf->width[i])) goto errout;
 
     fclose(fp);
-    return;
+    return; /* success!*/
 
 errout:
     fclose(fp);
@@ -784,228 +792,8 @@ errout:
     exit(1);
 }
 
-static void gen_gettextsize(Bitmap_Font* bf, const void* text, int cc,
-                            int* pwidth, int* pheight, int* pbase) {
-    const unsigned char* str = text;
-    unsigned int c;
-    int width;
-
-    if (bf->width == NULL)
-        width = cc * bf->maxwidth;
-    else {
-        width = 0;
-        while (--cc >= 0) {
-            c = *str++;
-            if (c >= bf->firstchar && c < bf->firstchar + bf->size)
-                width += bf->width[c - bf->firstchar];
-        }
-    }
-    *pwidth = width;
-    *pheight = bf->height;
-    *pbase = bf->ascent;
-}
-
-static void gen16_gettextsize(Bitmap_Font* bf, const unsigned short* str,
-                              int cc, int* pwidth, int* pheight, int* pbase) {
-    unsigned int c;
-    int width;
-
-    if (bf->width == NULL)
-        width = cc * bf->maxwidth;
-    else {
-        width = 0;
-        while (--cc >= 0) {
-            c = *str++;
-            if (c >= bf->firstchar && c < bf->firstchar + bf->size)
-                width += bf->width[c - bf->firstchar];
-        }
-    }
-    *pwidth = width;
-    *pheight = bf->height;
-    *pbase = bf->ascent;
-}
-
-static void gen_gettextbits(Bitmap_Font* bf, int ch,
-                            const unsigned short** retmap, int* pwidth,
-                            int* pheight, int* pbase) {
-    int count, width;
-    const unsigned short* bits;
-
-    if (ch < bf->firstchar || ch >= bf->firstchar + bf->size)
-        ch = bf->firstchar;
-
-    ch -= bf->firstchar;
-
-    if (bf->offset) {
-        if (((unsigned long*)bf->offset)[0] >= 0x00010000)
-            bits = bf->bits + ((unsigned short*)bf->offset)[ch];
-        else
-            bits = bf->bits + ((unsigned long*)bf->offset)[ch];
-    } else
-        bits = bf->bits + (bf->height * ch);
-
-    width = bf->width ? bf->width[ch] : bf->maxwidth;
-    count = ((width + 15) / 16) * bf->height;
-
-    *retmap = bits;
-
-    *pwidth = width;
-    *pheight = bf->height;
-    *pbase = bf->ascent;
-}
-
-static void corefont_drawtext(Bitmap_Font* bf, ttk_surface srf, int x, int y,
-                              const void* text, int cc, ttk_color col) {
-    const unsigned char* str = text;
-    int width, height, base, startx, starty;
-    const unsigned short* bitmap;
-
-    startx = x;
-    starty = y;
-
-    while (--cc >= 0 && x < srf->w) {
-        int ch = *str++;
-        gen_gettextbits(bf, ch, &bitmap, &width, &height, &base);
-        draw_bitmap(srf, x, y, width, height, bitmap, col);
-        x += width;
-    }
-}
-
-static void corefont16_drawtext(Bitmap_Font* bf, ttk_surface srf, int x, int y,
-                                const unsigned short* str, int cc,
-                                ttk_color col) {
-    int width, height, base, startx, starty;
-    const unsigned short* bitmap;
-
-    startx = x;
-    starty = y;
-
-    while (--cc >= 0 && x < srf->w) {
-        int ch = *str++;
-        gen_gettextbits(bf, ch, &bitmap, &width, &height, &base);
-        draw_bitmap(srf, x, y, width, height, bitmap, col);
-        x += width;
-    }
-}
-
-static int IsASCII(const char* str) {
-    const char* p = str;
-    while (*p) {
-        if (*p & 0x80) return 0;
-        p++;
-    }
-    return 1;
-}
-
-static int ConvertUTF8(const unsigned char* src, unsigned short* dst) {
-    const unsigned char* sp = src;
-    unsigned short* dp = dst;
-    int len = 0;
-    while (*sp) {
-        *dp = 0;
-        if (*sp < 0x80)
-            *dp = *sp++;
-        else if (*sp >= 0xC0 && *sp < 0xE0) {
-            *dp |= (*sp++ - 0xC0) << 6;
-            if (!*sp) goto err;
-            *dp |= (*sp++ - 0x80);
-        } else if (*sp >= 0xE0 && *sp < 0xF0) {
-            *dp |= (*sp++ - 0xE0) << 12;
-            if (!*sp) goto err;
-            *dp |= (*sp++ - 0x80) << 6;
-            if (!*sp) goto err;
-            *dp |= (*sp++ - 0x80);
-        } else
-            goto err;
-
-        dp++;
-        len++;
-        continue;
-
-    err:
-        *dp++ = '?';
-        sp++;
-        len++;
-    }
-    *dp = 0;
-    return len;
-}
-
-static void draw_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
-                    const char* str) {
-    const void* text = (const void*)str;
-    int cc = strlen(str);
-    if (!f->bf) return;
-
-    if (IsASCII(str))
-        corefont_drawtext(f->bf, srf, x, y, text, cc, col);
-    else {
-        unsigned short* buf = malloc(strlen(str) * 2);
-        int len = ConvertUTF8((unsigned char*)str, buf);
-        corefont16_drawtext(f->bf, srf, x, y, buf, len, col);
-        free(buf);
-    }
-}
-
-static void lat1_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
-                    const char* str) {
-    const void* text = (const void*)str;
-    int cc = strlen(str);
-    if (!f->bf) return;
-
-    corefont_drawtext(f->bf, srf, x, y, text, strlen(str), col);
-}
-
-static void uc16_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
-                    const uc16* str) {
-    int cc = 0;
-    const uc16* p = str;
-    if (!f->bf) return;
-
-    while (*p++) cc++;
-    corefont16_drawtext(f->bf, srf, x, y, str, cc, col);
-}
-
-static int width_bf(ttk_font f, const char* str) {
-    int width, height, base;
-    if (!f->bf) return -1;
-
-    if (IsASCII(str))
-        gen_gettextsize(f->bf, str, strlen(str), &width, &height, &base);
-    else {
-        unsigned short* buf = malloc(strlen(str) * 2);
-        int len = ConvertUTF8((unsigned char*)str, buf);
-        gen16_gettextsize(f->bf, buf, len, &width, &height, &base);
-        free(buf);
-    }
-    return width;
-}
-static int widthL_bf(ttk_font f, const char* str) {
-    int width, height, base;
-    if (!f->bf) return -1;
-    gen_gettextsize(f->bf, str, strlen(str), &width, &height, &base);
-    return width;
-}
-static int widthU_bf(ttk_font f, const uc16* str) {
-    int width, height, base;
-    int cc = 0;
-    const uc16* p = str;
-    if (!f->bf) return -1;
-
-    while (*p++) cc++;
-    gen16_gettextsize(f->bf, str, cc, &width, &height, &base);
-    return width;
-}
-
-static void free_bf(ttk_font f) {
-    if (f->bf->name) free(f->bf->name);
-    if (f->bf->bits) free((char*)f->bf->bits);
-    if (f->bf->offset) free((char*)f->bf->offset);
-    if (f->bf->width) free((char*)f->bf->width);
-    f->bf = 0;
-}
-
 #ifndef NO_SF
+/* SFont drawing and width functions */
 static void draw_sf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
                     const char* str) {
     Uint8 r, g, b;
@@ -1059,6 +847,7 @@ static void free_sf(ttk_font f) {
 #endif
 
 #ifndef NO_TF
+/* SDL_ttf drawing and width functions */
 #define TF_FUNC(name, type, func)                                    \
     static void name##_tf(ttk_font f, ttk_surface srf, int x, int y, \
                           ttk_color col, const type* str) {          \
@@ -1092,6 +881,327 @@ static int widthU_tf(ttk_font f, const uc16* str) {
 }
 static void free_tf(ttk_font f) { TTF_CloseFont(f->tf); }
 #endif
+
+/**** More stuff from microwin. src/drivers/genfont.c ****/
+/* Generic bitmap font text size calculation */
+static void gen_gettextsize(Bitmap_Font* bf, const void* text, int cc,
+                            int* pwidth, int* pheight, int* pbase) {
+    const unsigned char* str = text;
+    unsigned int c;
+    int width;
+
+    if (bf->width == NULL)
+        width = cc * bf->maxwidth;
+    else {
+        width = 0;
+        while (--cc >= 0) {
+            c = *str++;
+            if (c >= bf->firstchar && c < bf->firstchar + bf->size)
+                width += bf->width[c - bf->firstchar];
+        }
+    }
+    *pwidth = width;
+    *pheight = bf->height;
+    *pbase = bf->ascent;
+}
+
+static void gen16_gettextsize(Bitmap_Font* bf, const unsigned short* str,
+                              int cc, int* pwidth, int* pheight, int* pbase) {
+    unsigned int c;
+    int width;
+
+    if (bf->width == NULL)
+        width = cc * bf->maxwidth;
+    else {
+        width = 0;
+        while (--cc >= 0) {
+            c = *str++;
+            if (c >= bf->firstchar && c < bf->firstchar + bf->size)
+                width += bf->width[c - bf->firstchar];
+        }
+    }
+    *pwidth = width;
+    *pheight = bf->height;
+    *pbase = bf->ascent;
+}
+
+/* Generic bitmap font glyph retrieval */
+static void gen_gettextbits(Bitmap_Font* bf, int ch,
+                            const unsigned short** retmap, int* pwidth,
+                            int* pheight, int* pbase) {
+    int count, width;
+    const unsigned short* bits;
+
+    /* if char not in font, map to first character by default*/
+    if (ch < bf->firstchar || ch >= bf->firstchar + bf->size)
+        ch = bf->firstchar;
+
+    ch -= bf->firstchar;
+
+    /* get font bitmap depending on fixed pitch or not*/
+    /* GB: automatically detect if offset is 16 or 32 bit */
+    if (bf->offset) {
+        if (((unsigned long*)bf->offset)[0] >= 0x00010000)
+            bits = bf->bits + ((unsigned short*)bf->offset)[ch];
+        else
+            bits = bf->bits + ((unsigned long*)bf->offset)[ch];
+    } else
+        bits = bf->bits + (bf->height * ch);
+
+    width = bf->width ? bf->width[ch] : bf->maxwidth;
+    count = ((width + 15) / 16) * bf->height;
+
+    *retmap = bits;
+
+    /* return width depending on fixed pitch or not*/
+    *pwidth = width;
+    *pheight = bf->height;
+    *pbase = bf->ascent;
+}
+
+/** src/engine/devdraw.c, modified for SDL **/
+/* Draws a bitmap to the surface */
+static void draw_bitmap(ttk_surface srf, int x, int y, int width, int height,
+                        const unsigned short* imagebits, ttk_color color) {
+    int minx, maxx;
+    unsigned short bitvalue = 0;
+    int bitcount;
+
+    minx = x;
+    maxx = x + width - 1;
+    bitcount = 0;
+    while (height > 0) {
+        if (bitcount <= 0) {
+            bitcount = 16;
+            bitvalue = *imagebits++;
+        }
+        if (bitvalue & (1 << 15)) Paint_SetPixel(x, y, (UWORD)color);
+        bitvalue <<= 1;
+        bitcount--;
+
+        if (x++ == maxx) {
+            x = minx;
+            y++;
+            --height;
+            bitcount = 0;
+        }
+    }
+}
+
+void ttk_bitmap(ttk_surface srf, int x, int y, int w, int h,
+                unsigned short* imagebits, ttk_color col) {
+    SetupPaint(srf);
+    draw_bitmap(srf, x, y, w, h, imagebits, col);
+}
+void ttk_bitmap_gc(ttk_surface srf, ttk_gc gc, int x, int y, int w, int h,
+                   unsigned short* imagebits) {
+    SetupPaint(srf);
+    draw_bitmap(srf, x, y, w, h, imagebits, gc->fg);
+}
+
+/** src/engine/devfont.c **/
+/* Core routine to draw text using a bitmap font */
+static void corefont_drawtext(Bitmap_Font* bf, ttk_surface srf, int x, int y,
+                              const void* text, int cc, ttk_color col) {
+    const unsigned char* str = text;
+    int width, height, base, startx, starty;
+    const unsigned short* bitmap;
+
+    startx = x;
+    starty = y;
+
+    while (--cc >= 0 && x < srf->w) {
+        int ch = *str++;
+        gen_gettextbits(bf, ch, &bitmap, &width, &height, &base);
+        draw_bitmap(srf, x, y, width, height, bitmap, col);
+        x += width;
+    }
+}
+
+static void corefont16_drawtext(Bitmap_Font* bf, ttk_surface srf, int x, int y,
+                                const unsigned short* str, int cc,
+                                ttk_color col) {
+    int width, height, base, startx, starty;
+    const unsigned short* bitmap;
+
+    startx = x;
+    starty = y;
+
+    while (--cc >= 0 && x < srf->w) {
+        int ch = *str++;
+        gen_gettextbits(bf, ch, &bitmap, &width, &height, &base);
+        draw_bitmap(srf, x, y, width, height, bitmap, col);
+        x += width;
+    }
+}
+
+/**** end mwin copied stuff ****/
+
+/* Checks if a string is pure ASCII */
+static int IsASCII(const char* str) {
+    const char* p = str;
+    while (*p) {
+        if (*p & 0x80) return 0;
+        p++;
+    }
+    return 1;
+}
+
+/* Converts UTF-8 string to 16-bit Unicode */
+static int ConvertUTF8(const unsigned char* src, unsigned short* dst) {
+    const unsigned char* sp = src;
+    unsigned short* dp = dst;
+    int len = 0;
+    while (*sp) {
+        *dp = 0;
+        if (*sp < 0x80)
+            *dp = *sp++;
+        else if (*sp >= 0xC0 && *sp < 0xE0) {
+            *dp |= (*sp++ - 0xC0) << 6;
+            if (!*sp) goto err;
+            *dp |= (*sp++ - 0x80);
+        } else if (*sp >= 0xE0 && *sp < 0xF0) {
+            *dp |= (*sp++ - 0xE0) << 12;
+            if (!*sp) goto err;
+            *dp |= (*sp++ - 0x80) << 6;
+            if (!*sp) goto err;
+            *dp |= (*sp++ - 0x80);
+        } else
+            goto err;
+
+        dp++;
+        len++;
+        continue;
+
+    err:
+        *dp++ = '?';
+        sp++;
+        len++;
+    }
+    *dp = 0;
+    return len;
+}
+
+/* Bitmap font drawing wrapper (handles UTF-8 conversion if needed) */
+static void draw_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
+                    const char* str) {
+    const void* text = (const void*)str;
+    int cc = strlen(str);
+    if (!f->bf) return;
+
+    if (IsASCII(str))
+        corefont_drawtext(f->bf, srf, x, y, text, cc, col);
+    else {
+        unsigned short* buf = malloc(strlen(str) * 2);
+        int len = ConvertUTF8((unsigned char*)str, buf);
+        corefont16_drawtext(f->bf, srf, x, y, buf, len, col);
+        free(buf);
+    }
+}
+
+static void lat1_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
+                    const char* str) {
+    const void* text = (const void*)str;
+    int cc = strlen(str);
+    if (!f->bf) return;
+
+    corefont_drawtext(f->bf, srf, x, y, text, strlen(str), col);
+}
+
+static void uc16_bf(ttk_font f, ttk_surface srf, int x, int y, ttk_color col,
+                    const uc16* str) {
+    int cc = 0;
+    const uc16* p = str;
+    if (!f->bf) return;
+
+    while (*p++) cc++;
+    corefont16_drawtext(f->bf, srf, x, y, str, cc, col);
+}
+
+/* Bitmap font width calculation wrapper */
+static int width_bf(ttk_font f, const char* str) {
+    int width, height, base;
+    if (!f->bf) return -1;
+
+    if (IsASCII(str))
+        gen_gettextsize(f->bf, str, strlen(str), &width, &height, &base);
+    else {
+        unsigned short* buf = malloc(strlen(str) * 2);
+        int len = ConvertUTF8((unsigned char*)str, buf);
+        gen16_gettextsize(f->bf, buf, len, &width, &height, &base);
+        free(buf);
+    }
+    return width;
+}
+static int widthL_bf(ttk_font f, const char* str) {
+    int width, height, base;
+    if (!f->bf) return -1;
+    gen_gettextsize(f->bf, str, strlen(str), &width, &height, &base);
+    return width;
+}
+static int widthU_bf(ttk_font f, const uc16* str) {
+    int width, height, base;
+    int cc = 0;
+    const uc16* p = str;
+    if (!f->bf) return -1;
+
+    while (*p++) cc++;
+    gen16_gettextsize(f->bf, str, cc, &width, &height, &base);
+    return width;
+}
+
+static void free_bf(ttk_font f) {
+    if (f->bf->name) free(f->bf->name);
+    if (f->bf->bits) free((char*)f->bf->bits);
+    if (f->bf->offset) free((char*)f->bf->offset);
+    if (f->bf->width) free((char*)f->bf->width);
+    f->bf = 0;
+}
+
+/* TTK Text drawing functions */
+void ttk_text(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+              const char* str) {
+    fnt->draw(fnt, srf, x, y + fnt->ofs, col, str);
+}
+void ttk_text_lat1(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+                   const char* str) {
+    fnt->draw_lat1(fnt, srf, x, y + fnt->ofs, col, str);
+}
+void ttk_text_uc16(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+                   const uc16* str) {
+    fnt->draw_uc16(fnt, srf, x, y + fnt->ofs, col, str);
+}
+int ttk_text_width(ttk_font fnt, const char* str) {
+    if (!str) return 0;
+    return fnt->width(fnt, str);
+}
+int ttk_text_width_lat1(ttk_font fnt, const char* str) {
+    if (!str) return 0;
+    return fnt->width_lat1(fnt, str);
+}
+int ttk_text_width_uc16(ttk_font fnt, const uc16* str) {
+    if (!str) return 0;
+    return fnt->width_uc16(fnt, str);
+}
+int ttk_text_width_gc(ttk_gc gc, const char* str) {
+    return gc->font->width(gc->font, str);
+}
+int ttk_text_height(ttk_font fnt) { return fnt->height; }
+int ttk_text_height_gc(ttk_gc gc) { return gc->font->height; }
+/* Formatted text drawing */
+void ttk_textf(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
+               const char* fmt, ...) {
+    static char* buffer;
+    va_list ap;
+
+    if (!buffer) buffer = malloc(4096);
+
+    va_start(ap, fmt);
+    vsnprintf(buffer, 4096, fmt, ap);
+    va_end(ap);
+    fnt->draw(fnt, srf, x, y + fnt->ofs, col, buffer);
+}
+
 
 void ttk_load_font(ttk_fontinfo* fi, const char* fnbase, int size) {
     char* fname = alloca(strlen(fnbase) + 7); /* +7: - i . p n g \0 */
@@ -1160,48 +1270,7 @@ void ttk_unload_font(ttk_fontinfo* fi) {
     fi->good = 0;
 }
 
-void ttk_text(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
-              const char* str) {
-    fnt->draw(fnt, srf, x, y + fnt->ofs, col, str);
-}
-void ttk_text_lat1(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
-                   const char* str) {
-    fnt->draw_lat1(fnt, srf, x, y + fnt->ofs, col, str);
-}
-void ttk_text_uc16(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
-                   const uc16* str) {
-    fnt->draw_uc16(fnt, srf, x, y + fnt->ofs, col, str);
-}
-int ttk_text_width(ttk_font fnt, const char* str) {
-    if (!str) return 0;
-    return fnt->width(fnt, str);
-}
-int ttk_text_width_lat1(ttk_font fnt, const char* str) {
-    if (!str) return 0;
-    return fnt->width_lat1(fnt, str);
-}
-int ttk_text_width_uc16(ttk_font fnt, const uc16* str) {
-    if (!str) return 0;
-    return fnt->width_uc16(fnt, str);
-}
-int ttk_text_width_gc(ttk_gc gc, const char* str) {
-    return gc->font->width(gc->font, str);
-}
-int ttk_text_height(ttk_font fnt) { return fnt->height; }
-int ttk_text_height_gc(ttk_gc gc) { return gc->font->height; }
-void ttk_textf(ttk_surface srf, ttk_font fnt, int x, int y, ttk_color col,
-               const char* fmt, ...) {
-    static char* buffer;
-    va_list ap;
-
-    if (!buffer) buffer = malloc(4096);
-
-    va_start(ap, fmt);
-    vsnprintf(buffer, 4096, fmt, ap);
-    va_end(ap);
-    fnt->draw(fnt, srf, x, y + fnt->ofs, col, buffer);
-}
-
+/* Draws text using the Graphics Context settings */
 void ttk_text_gc(ttk_surface srf, ttk_gc gc, int x, int y, const char* str) {
     if (gc->usebg) {
         ttk_fillrect(srf, x, y, x + ttk_text_width_gc(gc, str),
@@ -1211,6 +1280,7 @@ void ttk_text_gc(ttk_surface srf, ttk_gc gc, int x, int y, const char* str) {
 }
 
 ttk_surface ttk_load_image(const char* path) { return IMG_Load(path); }
+
 void ttk_free_image(ttk_surface img) { SDL_FreeSurface(img); }
 void ttk_blit_image(ttk_surface src, ttk_surface dst, int dx, int dy) {
     SDL_Rect dr = {dx, dy, 0, 0};
@@ -1223,16 +1293,19 @@ void ttk_blit_image_ex(ttk_surface src, int sx, int sy, int sw, int sh,
     SDL_BlitSurface(src, &sr, dst, &dr);
 }
 
+/* Creates a new SDL surface with the specified dimensions and depth */
 ttk_surface ttk_new_surface(int w, int h, int bpp) {
     return SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 16, 0xF800, 0x07E0, 0x001F,
                                 0);
-}
-void ttk_free_surface(ttk_surface srf) { SDL_FreeSurface(srf); }
-void ttk_surface_get_dimen(ttk_surface srf, int* w, int* h) {
-    if (w) *w = srf->w;
-    if (h) *h = srf->h;
 }
 
 ttk_surface ttk_scale_surface(ttk_surface srf, float factor) {
     return zoomSurface(srf, factor, factor, 1);
 }
+
+void ttk_surface_get_dimen(ttk_surface srf, int* w, int* h) {
+    if (w) *w = srf->w;
+    if (h) *h = srf->h;
+}
+
+void ttk_free_surface(ttk_surface srf) { SDL_FreeSurface(srf); }
