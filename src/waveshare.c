@@ -1010,7 +1010,7 @@ static void draw_bitmap(ttk_surface srf, int x, int y, int width, int height,
             bitvalue = *imagebits++;
         }
         // if (bitvalue & (1 << 15)) Paint_SetPixel(x, y, (UWORD)color);
-        if (bitvalue & (1 << 15)) pixelfunc(srf, x, y, color);
+        if (bitvalue & (1 << 15)) fastPixelColor(srf, x, y, color);
         bitvalue <<= 1;
         bitcount--;
 
