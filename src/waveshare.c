@@ -630,13 +630,18 @@ void ttk_fillpoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
 
 /* Draw an ellipse or circle */
 void ttk_ellipse(ttk_surface srf, int x, int y, int rx, int ry, ttk_color col) {
-    SetupPaint(srf);
-    Paint_DrawCircle(x, y, rx, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+    // SetupPaint(srf);
+    // Paint_DrawCircle(x, y, rx, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+    if (rx == ry)
+        circleColor(srf, x, y, rx, fetchcolor(col));
+    else
+        ellipseColor(srf, x, y, rx, ry, fetchcolor(col));
 }
 
 void ttk_ellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx, int ry) {
-    SetupPaint(srf);
-    Paint_DrawCircle(x, y, rx, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+    // SetupPaint(srf);
+    // Paint_DrawCircle(x, y, rx, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+    ttk_ellipse(srf, x, y, rx, ry, gc->fg);
 }
 
 void ttk_aaellipse(ttk_surface srf, int x, int y, int rx, int ry,
@@ -653,12 +658,17 @@ void ttk_aaellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
 void ttk_fillellipse(ttk_surface srf, int x, int y, int rx, int ry,
                      ttk_color col) {
     SetupPaint(srf);
-    Paint_DrawCircle(x, y, rx, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    if (rx == ry)
+        filledCircleColor(srf, x, y, rx, fetchcolor(col));
+    else
+        filledEllipseColor(srf, x, y, rx, ry, fetchcolor(col));
+    // Paint_DrawCircle(x, y, rx, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_FULL);
 }
 void ttk_fillellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx,
                         int ry) {
-    SetupPaint(srf);
-    Paint_DrawCircle(x, y, rx, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    // SetupPaint(srf);
+    // Paint_DrawCircle(x, y, rx, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    ttk_fillellipse(srf, x, y, rx, ry, gc->fg);
 }
 
 /* Custom implementation to draw an anti-aliased filled ellipse */
@@ -999,7 +1009,8 @@ static void draw_bitmap(ttk_surface srf, int x, int y, int width, int height,
             bitcount = 16;
             bitvalue = *imagebits++;
         }
-        if (bitvalue & (1 << 15)) Paint_SetPixel(x, y, (UWORD)color);
+        // if (bitvalue & (1 << 15)) Paint_SetPixel(x, y, (UWORD)color);
+        if (bitvalue & (1 << 15)) pixelfunc(srf, x, y, color);
         bitvalue <<= 1;
         bitcount--;
 
