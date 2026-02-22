@@ -106,7 +106,7 @@ void ttk_gfx_update(ttk_surface srf) {
     }
 
 #ifdef PRINT_SURFACE_STDOUT
-    printf("\033[H");
+    printf("\033[2J\033[H");
     for (int i = 0; i < count; i++) {
         uint16_t p = pixels[i];
         uint8_t r = (p >> 11) & 0x1F;
