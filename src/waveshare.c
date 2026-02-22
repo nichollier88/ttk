@@ -424,8 +424,10 @@ void ttk_vgradient(ttk_surface srf, int x1, int y1, int x2, int y2,
 
 /* Draw a polygon */
 void ttk_poly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
+    SetupPaint(srf);
     polygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
 }
+
 void ttk_poly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
     int i;
     short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
@@ -439,19 +441,23 @@ void ttk_poly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
         vy[i] = v[i].y;
     }
 
-    polygonColor(srf, vx, vy, n, fetchcolor(col));
+    // polygonColor(srf, vx, vy, n, fetchcolor(col));
+    ttk_poly(srf, n, vx, vy, col);
 
     free(vx);
     free(vy);
 }
+
 void ttk_poly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_poly_pt(srf, v, n, gc->fg);
 }
 
 /* Draw an anti-aliased polygon */
 void ttk_aapoly(ttk_surface srf, int nv, short* vx, short* vy, ttk_color col) {
+    SetupPaint(srf);
     aapolygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
 }
+
 void ttk_aapoly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
     int i;
     short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
@@ -465,11 +471,13 @@ void ttk_aapoly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
         vy[i] = v[i].y;
     }
 
-    aapolygonColor(srf, vx, vy, n, fetchcolor(col));
+    // aapolygonColor(srf, vx, vy, n, fetchcolor(col));
+    ttk_aapoly(srf, n, vx, vy, col);
 
     free(vx);
     free(vy);
 }
+
 void ttk_aapoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_aapoly_pt(srf, v, n, gc->fg);
 }
@@ -477,8 +485,10 @@ void ttk_aapoly_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
 /* Draw a polyline (open polygon) */
 void ttk_polyline(ttk_surface srf, int nv, short* vx, short* vy,
                   ttk_color col) {
+    SetupPaint(srf);
     polylineColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
 }
+
 void ttk_polyline_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
     int i;
     short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
@@ -492,11 +502,13 @@ void ttk_polyline_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
         vy[i] = v[i].y;
     }
 
-    polylineColor(srf, vx, vy, n, fetchcolor(col));
+    // polylineColor(srf, vx, vy, n, fetchcolor(col));
+    ttk_polyline(srf, n, vx, vy, col);
 
     free(vx);
     free(vy);
 }
+
 void ttk_polyline_gc(ttk_surface srf, ttk_gc gc, int n, ttk_point* v) {
     ttk_polyline_pt(srf, v, n, gc->fg);
 }
@@ -569,6 +581,7 @@ void ttk_bezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3, int y3,
                 int x4, int y4, int level, ttk_color col) {
     DO_BEZIER(ttk_line(srf, (short)xp, (short)yp, (short)x, (short)y, col));
 }
+
 void ttk_bezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
                    int x3, int y3, int x4, int y4, int level) {
     ttk_bezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
@@ -579,6 +592,7 @@ void ttk_aabezier(ttk_surface srf, int x1, int y1, int x2, int y2, int x3,
                   int y3, int x4, int y4, int level, ttk_color col) {
     DO_BEZIER(ttk_aaline(srf, (short)xp, (short)yp, (short)x, (short)y, col));
 }
+
 void ttk_aabezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
                      int x3, int y3, int x4, int y4, int level) {
     ttk_aabezier(srf, x1, y1, x2, y2, x3, y3, x4, y4, level, gc->fg);
@@ -587,8 +601,10 @@ void ttk_aabezier_gc(ttk_surface srf, ttk_gc gc, int x1, int y1, int x2, int y2,
 /* Draw a filled polygon */
 void ttk_fillpoly(ttk_surface srf, int nv, short* vx, short* vy,
                   ttk_color col) {
+    SetupPaint(srf);
     filledPolygonColor(srf, (Sint16*)vx, (Sint16*)vy, nv, fetchcolor(col));
 }
+
 void ttk_fillpoly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
     int i;
     short *vx = malloc(n * sizeof(short)), *vy = malloc(n * sizeof(short));
@@ -602,7 +618,8 @@ void ttk_fillpoly_pt(ttk_surface srf, ttk_point* v, int n, ttk_color col) {
         vy[i] = v[i].y;
     }
 
-    filledPolygonColor(srf, vx, vy, n, fetchcolor(col));
+    // filledPolygonColor(srf, vx, vy, n, fetchcolor(col));
+    ttk_fillpoly(srf, n, vx, vy, col);
 
     free(vx);
     free(vy);
@@ -616,6 +633,7 @@ void ttk_ellipse(ttk_surface srf, int x, int y, int rx, int ry, ttk_color col) {
     SetupPaint(srf);
     Paint_DrawCircle(x, y, rx, (UWORD)col, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 }
+
 void ttk_ellipse_gc(ttk_surface srf, ttk_gc gc, int x, int y, int rx, int ry) {
     SetupPaint(srf);
     Paint_DrawCircle(x, y, rx, (UWORD)gc->fg, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
