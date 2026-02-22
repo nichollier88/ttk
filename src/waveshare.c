@@ -50,6 +50,19 @@ typedef struct sdl_additional {
 
 sdl_additional sdl_add = {0, 0};
 
+/* Sets up a grayscale palette for 2bpp simulation on 8bpp surfaces */
+static void palettize(SDL_Surface* srf) {
+    if (ttk_screen->bpp == 2) {
+        int grp;
+        SDL_Color colors[] = {
+            {255, 255, 255}, {160, 160, 160}, {80, 80, 80}, {0, 0, 0}};
+        for (grp = 0; grp < 256; grp += 4) {
+            SDL_SetColors(srf, colors, grp, 4);
+        }
+        SDL_FillRect(srf, 0, 0);
+    }
+}
+
 // --- TTK Backend Implementation ---
 
 /* Initialize SDL video, timer, and set up the screen surface */
@@ -81,6 +94,7 @@ void ttk_gfx_init() {
     ttk_screen->h = 128;
     ttk_screen->bpp = 16;
 
+    palettize(ttk_screen->srf);
     SDL_EnableUNICODE(1);
 }
 
@@ -1329,8 +1343,11 @@ void ttk_blit_image_ex(ttk_surface src, int sx, int sy, int sw, int sh,
 
 /* Creates a new SDL surface with the specified dimensions and depth */
 ttk_surface ttk_new_surface(int w, int h, int bpp) {
-    return SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 16, 0xF800, 0x07E0, 0x001F,
+    SDL_Surface* ret = SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 16, 0xF800, 0x07E0, 0x001F,
                                 0);
+    SDL_SetColorKey(ret, SDL_SRCCOLORKEY, ttk_makecol_ex(CKEY, ret));
+    SDL_FillRect(ret, 0, ttk_makecol_ex(CKEY, ret));
+    return ret;
 }
 
 ttk_surface ttk_scale_surface(ttk_surface srf, float factor) {
