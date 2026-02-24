@@ -35,6 +35,8 @@ extern char* gettext(const char* msgid);
 #endif
 
 #define _MAKETHIS menu_data* data = (menu_data*)this->data
+#define TTK_MENU_LINE_SPACING 10
+#define TTK_MENU_LEFT_PADDING 6
 
 extern ttk_screeninfo* ttk_screen;
 
@@ -832,7 +834,7 @@ TWidget* ttk_new_menu_widget(ttk_menu_item* items, ttk_font font, int w,
     ret->scroll = ttk_menu_scroll;
     ret->destroy = ttk_menu_free;
 
-    data->visible = h / (ttk_text_height(font) + 4);
+    data->visible = h / (ttk_text_height(font) + TTK_MENU_LINE_SPACING);
     data->itemheight = h / data->visible;
     data->mlist = items;
     data->menu = 0;
@@ -873,7 +875,7 @@ void ttk_menu_draw(TWidget* this, ttk_surface srf) {
     if (ttk_epoch > data->epoch) {
         int i;
         data->font = ttk_menufont;
-        data->visible = this->h / (ttk_text_height(data->font) + 4);
+        data->visible = this->h / (ttk_text_height(data->font) + TTK_MENU_LINE_SPACING);
         data->itemheight = this->h / data->visible;
         for (i = 0; i < data->items; i++)
             ttk_menu_item_updated(this, data->menu[i]);
