@@ -53,6 +53,10 @@
 #define TTK_MENU_GROUP_LAST	(0x80)	/* item is the last menu item in a group */
 #define TTK_MENU_GROUP_SET	(TTK_MENU_GROUP_FIRST|TTK_MENU_GROUP_MIDDLE|TTK_MENU_GROUP_LAST|TTK_MENU_GROUP_ONLY)	/* has F/M/L been set yet? */
 
+// Padding
+#define TTK_MENU_LINE_SPACING 10
+#define TTK_MENU_LEFT_PADDING 6
+
 typedef struct ttk_menu_item 
 {
     const char *name; // required

@@ -35,8 +35,6 @@ extern char* gettext(const char* msgid);
 #endif
 
 #define _MAKETHIS menu_data* data = (menu_data*)this->data
-#define TTK_MENU_LINE_SPACING 10
-#define TTK_MENU_LEFT_PADDING 6
 
 extern ttk_screeninfo* ttk_screen;
 
@@ -169,18 +167,18 @@ static void render(TWidget* this, int first, int n) {
         /* setup the Unselected cache */
 
         if (data->itemsrf[xi]) ttk_free_surface(data->itemsrf[xi]);
-        data->itemsrf[xi] = ttk_new_surface(data->menu[xi]->textwidth + 3,
+        data->itemsrf[xi] = ttk_new_surface(data->menu[xi]->textwidth + TTK_MENU_LEFT_PADDING,
                                             data->itemheight, ttk_screen->bpp);
 
         ta = ttk_ap_getx(ih ? "menu.hdrbg" : "menu.bg");
         if (ta->type & TTK_AP_GRADIENT && !(ta->type & TTK_AP_GRAD_HORIZ)) {
             // ap surface
             ttk_ap_rect(data->itemsrf[xi], ta, 0, 0,
-                        data->menu[xi]->textwidth + 3 + ta->rounding,
+                        data->menu[xi]->textwidth + TTK_MENU_LEFT_PADDING + ta->rounding,
                         data->itemheight);
         } else {
             // solid
-            ttk_fillrect(data->itemsrf[xi], 0, 0, data->menu[xi]->textwidth + 3,
+            ttk_fillrect(data->itemsrf[xi], 0, 0, data->menu[xi]->textwidth + TTK_MENU_LEFT_PADDING,
                          data->itemheight,
                          ih ? menu_hdrbg_color : menu_bg_color);
         }
@@ -202,14 +200,14 @@ static void render(TWidget* this, int first, int n) {
             }
         }
 
-        ttk_text(data->itemsrf[xi], data->font, 3, ofs,
+        ttk_text(data->itemsrf[xi], data->font, TTK_MENU_LEFT_PADDING, ofs,
                  ih ? menu_hdrfg_color : menu_fg_color, truncname);
         free(truncname);
 
         /* setup the Selected cache */
 
         if (data->itemsrfI[xi]) ttk_free_surface(data->itemsrfI[xi]);
-        data->itemsrfI[xi] = ttk_new_surface(data->menu[xi]->textwidth + 3,
+        data->itemsrfI[xi] = ttk_new_surface(data->menu[xi]->textwidth + TTK_MENU_LEFT_PADDING,
                                              data->itemheight, ttk_screen->bpp);
 
         // selected background
@@ -218,24 +216,25 @@ static void render(TWidget* this, int first, int n) {
         if (ta->type & TTK_AP_GRADIENT && !(ta->type & TTK_AP_GRAD_HORIZ)) {
             // ap surface
             ttk_ap_rect(data->itemsrfI[xi], ta, 0, 0,
-                        data->menu[xi]->textwidth + 3 + ta->rounding,
+                        data->menu[xi]->textwidth + TTK_MENU_LEFT_PADDING + ta->rounding,
                         data->itemheight);
         } else {
             // solid
             ttk_fillrect(data->itemsrfI[xi], 0, 0,
-                         data->menu[xi]->textwidth + 3, data->itemheight,
+                         data->menu[xi]->textwidth + TTK_MENU_LEFT_PADDING, data->itemheight,
                          ih ? menu_hdrbg_color : menu_selbg_color);
         }
         // selected text
         if (data->i18nable)
             ttk_text(
-                data->itemsrfI[xi], data->font, 3, ofs,
+                data->itemsrfI[xi], data->font, TTK_MENU_LEFT_PADDING, ofs,
                 ih ? menu_hdrfg_color : menu_selfg_color,
                 ttk_filter_sorting_characters(gettext(data->menu[xi]->name)));
         else
-            ttk_text(data->itemsrfI[xi], data->font, 3, ofs,
-                     ih ? menu_hdrfg_color : menu_selfg_color,
-                     ttk_filter_sorting_characters(data->menu[xi]->name));
+            ttk_text(
+                data->itemsrfI[xi], data->font, TTK_MENU_LEFT_PADDING, ofs,
+                ih ? menu_hdrfg_color : menu_selfg_color,
+                ttk_filter_sorting_characters(data->menu[xi]->name));
     }
 }
 
